@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>擬似UEFI 骨格プレビュー</title>
+<style>
+  :root{
+    --bar:#3c4a54;        /* キャプションバー */
+    --bar2:#4a5a66;       /* パンくず */
+    --green:#3f7d68;      /* 左の緑パネル */
+    --hl:#00a982;         /* HPEグリーン ハイライト */
+    --taupe:#6d6055;      /* キー凡例パネル */
+    --ink:#1c1e24; --line:#c9ced6; --field:#ffffff; --fieldg:#eef1f4;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#20262b;color:var(--ink);
+    font-family:"Segoe UI","Hiragino Kaku Gothic ProN",system-ui,sans-serif;}
+  .note{max-width:1024px;margin:10px auto 6px;color:#9fb0bd;font-size:12px;padding:0 8px;}
+  .screen{width:1024px;max-width:100%;margin:0 auto 24px;background:#fff;
+    box-shadow:0 4px 20px rgba(0,0,0,.4);display:flex;flex-direction:column;min-height:560px;}
+  /* --- キャプションバー --- */
+  .cap{background:var(--bar);color:#fff;display:flex;align-items:center;gap:14px;padding:10px 16px;}
+  .cap .logo{width:40px;height:16px;border:2px solid #00a982;border-top:none;border-left:none;
+    box-shadow:inset 0 6px 0 -3px #00a982;}
+  .cap h1{font-size:20px;margin:0;font-weight:600;flex:1;letter-spacing:.02em;}
+  .cap .icons{display:flex;gap:14px;font-size:15px;opacity:.9;}
+  /* --- パンくず(矢羽根) --- */
+  .crumbs{background:var(--bar2);display:flex;font-size:12.5px;color:#dfe6ec;}
+  .crumbs .c{position:relative;padding:7px 22px 7px 26px;background:var(--bar2);}
+  .crumbs .c::after{content:"";position:absolute;right:-9px;top:0;border-left:9px solid var(--bar2);
+    border-top:16px solid transparent;border-bottom:16px solid transparent;z-index:2;}
+  .crumbs .c::before{content:"";position:absolute;right:-11px;top:0;border-left:9px solid #2c3843;
+    border-top:16px solid transparent;border-bottom:16px solid transparent;z-index:1;}
+  .crumbs .c.home{padding-left:16px;}
+  /* --- 本体 --- */
+  .body{display:flex;flex:1;}
+  .side{width:270px;flex:0 0 270px;display:flex;flex-direction:column;}
+  .side .info{background:var(--green);color:#eafff6;padding:16px 16px 18px;font-size:12px;line-height:1.6;}
+  .side .info .model{font-size:19px;font-weight:700;color:#fff;line-height:1.2;margin-bottom:10px;}
+  .side .keys{background:var(--taupe);color:#f0ebe5;font-size:11.5px;padding:12px 16px;flex:1;line-height:1.9;}
+  .side .keys b{display:inline-block;width:44px;color:#fff;}
+  .main{flex:1;padding:18px 26px;}
+  .main h2{font-size:26px;margin:0 0 16px;font-weight:600;color:#2a2c31;}
+  /* フォーム行 */
+  .row{display:flex;align-items:center;gap:12px;padding:7px 6px;margin:0 -6px;cursor:default;}
+  .row:hover{background:#eef7f3;}
+  .row.sel{background:var(--hl);color:#fff;}
+  .row .lbl{flex:1;font-size:14px;font-weight:600;color:#2f7d68;}
+  .row.sel .lbl,.row.menu .lbl{color:inherit;}
+  .row.menu .lbl{color:#2a2c31;font-weight:600;}
+  .row.menu{cursor:pointer;}
+  .row.menu:hover{background:var(--hl);color:#fff;}
+  .row.menu:hover .lbl{color:#fff;}
+  .arrow{color:var(--hl);font-weight:700;}
+  .row.sel .arrow,.row.menu:hover .arrow{color:#fff;}
+  /* コントロール */
+  .ctl{width:340px;flex:0 0 340px;}
+  select,input{width:100%;padding:6px 8px;border:1px solid var(--line);background:var(--field);
+    font-size:13px;font-family:inherit;border-radius:2px;}
+  .ctl.dim input,.ctl.dim select{background:var(--fieldg);color:#9aa2ab;}
+  .sub{color:#5b6470;font-size:13px;margin:2px 0 14px;}
+  .chk{display:flex;align-items:center;gap:10px;padding:6px;font-size:14px;}
+  .chk input{width:auto;}
+  /* --- 下部バー --- */
+  .foot{background:#e9edf1;border-top:1px solid var(--line);display:flex;align-items:center;
+    gap:16px;padding:8px 14px;font-size:12px;color:#5b6470;}
+  .foot .exit{border:1px solid #333;background:#fff;padding:5px 26px;font-weight:600;color:#222;cursor:pointer;}
+  .foot .rad{display:flex;align-items:center;gap:6px;}
+  .foot .rad::before{content:"";width:11px;height:11px;border:1px solid #9aa2ab;border-radius:50%;display:inline-block;}
+  .foot .fk{margin-left:auto;display:flex;gap:8px;}
+  .foot .fk span{background:#dfe4e9;border:1px solid #c2c9d0;padding:5px 12px;border-radius:2px;}
+  .hidden{display:none;}
+  @keyframes postfill{0%{width:3%}80%{width:92%}100%{width:100%}}
+  .postbar{height:100%;background:#00a982;width:3%;animation:postfill 5.5s cubic-bezier(.4,.1,.2,1) infinite;}
+</style>
+</head>
+<body>
+
+  <div class="note">⚠ 擬似・参考用スケルトン（実機・ファーム版で細部は異なる）。骨格の雰囲気確認用。進む＝<b>POST画面のF9</b>や緑の項目クリック／<b>戻る＝ESCキー・上部パンくずクリック</b>（実機準拠）。左下Exitの挙動は実機で要確認。</div>
+
+<!-- ============ 画面0: POST ============ -->
+<section class="screen" id="s-post">
+  <div style="background:#000;color:#cfd6dd;font-family:Consolas,'SFMono-Regular',monospace;
+    font-size:13px;line-height:1.7;padding:22px 26px;flex:1;display:flex;flex-direction:column;">
+    <div style="font-size:26px;font-weight:700;color:#fff;letter-spacing:.03em;margin-bottom:14px;">HPE ProLiant</div>
+    <div style="height:10px;width:40%;border:1px solid #3a4a55;margin-bottom:16px;overflow:hidden;">
+      <div class="postbar"></div></div>
+    (C) Copyright 1982-2026 Hewlett Packard Enterprise Development LP<br>
+    HPE ProLiant DL320 Gen11<br>
+    System ROM Version: U63 v1.32 (03/23/2023)<br>
+    Serial Number: XXXXXXXXX<br><br>
+    Installed System Memory: 16 GB, Available System Memory: 16 GB<br>
+    1 Processor(s) detected, 8 total cores enabled<br>
+    Proc 1: Intel(R) Xeon(R) Bronze 3408U<br><br>
+    Secure Boot: Disabled<br>
+    Starting required devices. Please wait, this may take a few moments....<br><br>
+    <span style="color:#00a982;">iLO 6 IPv4: 169.254.0.2</span><br>
+    <div style="margin-top:auto;display:flex;gap:26px;padding-top:20px;font-size:13px;">
+      <span onclick="go('s-sysutil')" style="cursor:pointer;"><b style="background:#fff;color:#000;padding:2px 8px;border-radius:3px;">F9</b> System Utilities</span>
+      <span><b style="border:1px solid #6b7681;padding:2px 8px;border-radius:3px;">F10</b> Intelligent Provisioning</span>
+      <span><b style="border:1px solid #6b7681;padding:2px 8px;border-radius:3px;">F11</b> Boot Menu</span>
+      <span><b style="border:1px solid #6b7681;padding:2px 8px;border-radius:3px;">F12</b> Network Boot</span>
+    </div>
+  </div>
+  <div class="foot"><span style="color:#5b6470;">POST Code : 0040 &nbsp;&nbsp;（<b>F9</b> をクリックして System Utilities へ）</span></div>
+</section>
+
+<!-- ============ 画面0b: System Utilities ============ -->
+<section class="screen hidden" id="s-sysutil">
+  <div class="cap"><span class="logo"></span><h1>System Utilities</h1>
+    <span class="icons">🔧 ? 🔍 🌐 ⟳ 🗄</span></div>
+  <div class="crumbs"><span class="c home">🏠 System Utilities</span></div>
+  <div class="body">
+    <aside class="side">
+      <div class="info"><div class="model">HPE<br>ProLiant DL320 Gen11</div>
+        Server SN: XXXXXXXXX<br>iLO IPv4: 169.254.0.2<br>User Default: OFF<br>
+        Secure Boot: Disabled<br>System ROM: U63 v1.32</div>
+      <div class="keys"><b>Enter</b>Select<br><b>ESC</b>Exit<br><b>F1</b>Help<br>
+        <b>F7</b>Load Defaults<br><b>F10</b>Save<br><b>F12</b>Save and Exit</div>
+    </aside>
+    <div class="main">
+      <div class="row menu" onclick="go('s-sysconfig')"><span class="lbl">System Configuration</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">One-Time Boot Menu</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Embedded Applications</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">System Information</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">System Health</span><span class="arrow">➜</span></div>
+      <div class="row menu" style="margin-top:14px"><span class="lbl">Exit and resume system boot</span></div>
+      <div class="row menu"><span class="lbl">Reboot the System</span></div>
+    </div>
+  </div>
+  <div class="foot"><span class="exit" title="暫定：実機で挙動要確認（戻るはESC/パンくずが正典）" onclick="back()">Exit</span><span class="rad">Changes Pending</span>
+    <span class="rad">Reboot Required</span>
+    <span class="fk"><span>F7: Load Defaults</span><span>F10: Save</span><span>F12: Save and Exit</span></span></div>
+</section>
+
+<!-- ============ 画面0c: System Configuration 一覧 ============ -->
+<section class="screen hidden" id="s-sysconfig">
+  <div class="cap"><span class="logo"></span><h1>System Configuration</h1>
+    <span class="icons">🔧 ? 🔍 🌐 ⟳ 🗄</span></div>
+  <div class="crumbs">
+    <span class="c home">🏠 System Utilities</span>
+    <span class="c">System Configuration</span>
+  </div>
+  <div class="body">
+    <aside class="side">
+      <div class="info"><div class="model">HPE<br>ProLiant DL320 Gen11</div>
+        Server SN: XXXXXXXXX<br>iLO IPv4: 169.254.0.2<br>User Default: OFF<br>
+        Secure Boot: Disabled<br>System ROM: U63 v1.32</div>
+      <div class="keys"><b>Enter</b>Select<br><b>ESC</b>Exit<br><b>F1</b>Help<br>
+        <b>F7</b>Load Defaults<br><b>F10</b>Save<br><b>F12</b>Save and Exit</div>
+    </aside>
+    <div class="main">
+      <h2>System Configuration</h2>
+      <div class="row menu"><span class="lbl">BIOS/Platform Configuration (RBSU)</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">iLO 6 Configuration Utility</span><span class="arrow">➜</span></div>
+      <div class="row menu sel" onclick="go('s-menu')" style="cursor:pointer"><span class="lbl">Slot 1 Port 1 : HPE MR408i-o Gen11</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Embedded LOM 1 Port 1 : BCM 5720 - NIC</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Embedded LOM 1 Port 2 : BCM 5720 - NIC</span><span class="arrow">➜</span></div>
+    </div>
+  </div>
+  <div class="foot"><span class="exit" title="暫定：実機で挙動要確認（戻るはESC/パンくずが正典）" onclick="back()">Exit</span><span class="rad">Changes Pending</span>
+    <span class="rad">Reboot Required</span>
+    <span class="fk"><span>F7: Load Defaults</span><span>F10: Save</span><span>F12: Save and Exit</span></span></div>
+</section>
+
+<!-- ============ 画面1: MR Main Menu ============ -->
+<section class="screen hidden" id="s-menu">
+  <div class="cap"><span class="logo"></span><h1>System Configuration</h1>
+    <span class="icons">🔧 ? 🔍 🌐 ⟳ 🗄</span></div>
+  <div class="crumbs">
+    <span class="c home">🏠 System Utilities</span>
+    <span class="c">System Configuration</span>
+    <span class="c">Slot 1 : HPE MR408i-o Gen11</span>
+    <span class="c">Main Menu</span>
+  </div>
+  <div class="body">
+    <aside class="side">
+      <div class="info"><div class="model">HPE<br>ProLiant DL320 Gen11</div>
+        Server SN: XXXXXXXXX<br>iLO IPv4: 169.254.0.2<br>User Default: OFF<br>
+        Secure Boot: Disabled<br>System ROM: U63 v1.32</div>
+      <div class="keys"><b>Enter</b>Select<br><b>ESC</b>Exit<br><b>F1</b>Help<br>
+        <b>F7</b>Load Defaults<br><b>F10</b>Save<br><b>F12</b>Save and Exit</div>
+    </aside>
+    <div class="main">
+      <h2>Main Menu</h2>
+      <div class="row menu" onclick="go('s-create')"><span class="lbl">Configuration Management</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Controller Management</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Logical Drive Management</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Drive Management</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Hardware Components</span><span class="arrow">➜</span></div>
+    </div>
+  </div>
+  <div class="foot"><span class="exit" title="暫定：実機で挙動要確認（戻るはESC/パンくずが正典）" onclick="back()">Exit</span><span class="rad">Changes Pending</span>
+    <span class="rad">Reboot Required</span>
+    <span class="fk"><span>F7: Load Defaults</span><span>F10: Save</span><span>F12: Save and Exit</span></span></div>
+</section>
+
+<!-- ============ 画面2: Create Logical Drive ============ -->
+<section class="screen hidden" id="s-create">
+  <div class="cap"><span class="logo"></span><h1>System Configuration</h1>
+    <span class="icons">🔧 ? 🔍 🌐 ⟳ 🗄</span></div>
+  <div class="crumbs">
+    <span class="c home">☰ More Forms</span>
+    <span class="c">Main Menu</span>
+    <span class="c">Configuration Management</span>
+    <span class="c">Create Logical Drive</span>
+  </div>
+  <div class="body">
+    <aside class="side">
+      <div class="info"><div class="model">HPE<br>ProLiant DL320 Gen11</div>
+        Server SN: XXXXXXXXX<br>iLO IPv4: 169.254.0.2<br>User Default: OFF<br>
+        Secure Boot: Disabled<br>System ROM: U63 v1.32</div>
+      <div class="keys"><b>Enter</b>Select<br><b>ESC</b>Exit<br><b>F1</b>Help<br>
+        <b>F7</b>Load Defaults<br><b>F10</b>Save<br><b>F12</b>Save and Exit</div>
+    </aside>
+    <div class="main">
+      <h2>Create Logical Drive</h2>
+      <div class="row menu" onclick="go('s-menu')"><span class="lbl" style="color:#9aa2ab">Save Configuration</span><span class="arrow" style="color:#9aa2ab">◌</span></div>
+      <div class="row sel"><span class="lbl">Select RAID Level</span>
+        <span class="ctl"><select><option>RAID1</option><option>RAID0</option><option>RAID5</option><option>RAID6</option><option>RAID10</option></select></span></div>
+      <div class="chk"><input type="checkbox" disabled> Secure Logical Drive</div>
+      <div class="row"><span class="lbl">Unmap Capability</span>
+        <span class="ctl"><select><option>Disabled</option><option>Enabled</option></select></span></div>
+      <div class="row"><span class="lbl">Select Drives From</span>
+        <span class="ctl"><select><option>Unconfigured Capacity</option><option>Free Capacity</option></select></span></div>
+      <div class="row menu" onclick="go('s-drives')"><span class="lbl">Select Drives</span><span class="arrow">➜</span></div>
+      <div class="sub" style="margin-top:14px;font-weight:600;color:#2a2c31">CONFIGURE LOGICAL DRIVE PARAMETERS:</div>
+      <div class="row"><span class="lbl">Logical Drive Name</span><span class="ctl"><input value="OS"></span></div>
+      <div class="row"><span class="lbl">Strip Size</span><span class="ctl"><select><option>256 KB</option><option>64 KB</option></select></span></div>
+    </div>
+  </div>
+  <div class="foot"><span class="exit" title="暫定：実機で挙動要確認（戻るはESC/パンくずが正典）" onclick="back()">Exit</span><span class="rad">Changes Pending</span>
+    <span class="rad">Reboot Required</span>
+    <span class="fk"><span>F7: Load Defaults</span><span>F10: Save</span><span>F12: Save and Exit</span></span></div>
+</section>
+
+<!-- ============ 画面3: Select Drives ============ -->
+<section class="screen hidden" id="s-drives">
+  <div class="cap"><span class="logo"></span><h1>System Configuration</h1>
+    <span class="icons">🔧 ? 🔍 🌐 ⟳ 🗄</span></div>
+  <div class="crumbs">
+    <span class="c home">☰ More Forms</span>
+    <span class="c">Configuration Management</span>
+    <span class="c">Create Logical Drive</span>
+    <span class="c">Select Drives</span>
+  </div>
+  <div class="body">
+    <aside class="side">
+      <div class="info"><div class="model">HPE<br>ProLiant DL320 Gen11</div>
+        Server SN: XXXXXXXXX<br>iLO IPv4: 169.254.0.2<br>User Default: OFF<br>
+        Secure Boot: Disabled<br>System ROM: U63 v1.32</div>
+      <div class="keys"><b>Enter</b>Select<br><b>ESC</b>Exit<br><b>F1</b>Help<br>
+        <b>F7</b>Load Defaults<br><b>F10</b>Save<br><b>F12</b>Save and Exit</div>
+    </aside>
+    <div class="main">
+      <h2>Select Drives</h2>
+      <div class="row menu" onclick="go('s-create')"><span class="lbl">Apply Changes</span><span class="arrow">◌</span></div>
+      <div class="row"><span class="lbl">Select Media Type</span><span class="ctl"><select><option>Both</option></select></span></div>
+      <div class="row"><span class="lbl">Select Interface Type</span><span class="ctl"><select><option>All</option></select></span></div>
+      <div class="sub" style="margin-top:12px;font-weight:600;color:#2a2c31">CHOOSE UNCONFIGURED DRIVES:</div>
+      <div class="chk"><input type="checkbox" checked> Port 0, Box 1, Bay 1: SATA, HDD, 2TB, Unconfigured Good</div>
+      <div class="chk"><input type="checkbox" checked> Port 0, Box 1, Bay 2: SATA, HDD, 2TB, Unconfigured Good</div>
+      <div class="chk"><input type="checkbox"> Port 0, Box 1, Bay 3: SATA, HDD, 2TB, Unconfigured Good</div>
+      <div class="chk"><input type="checkbox"> Port 0, Box 1, Bay 4: SATA, HDD, 2TB, Unconfigured Good</div>
+      <div class="row menu" onclick="go('s-create')"><span class="lbl">Check All</span></div>
+      <div class="row menu" onclick="go('s-create')"><span class="lbl">Apply Changes</span><span class="arrow">➜</span></div>
+    </div>
+  </div>
+  <div class="foot"><span class="exit" title="暫定：実機で挙動要確認（戻るはESC/パンくずが正典）" onclick="back()">Exit</span><span class="rad">Changes Pending</span>
+    <span class="rad">Reboot Required</span>
+    <span class="fk"><span>F7: Load Defaults</span><span>F10: Save</span><span>F12: Save and Exit</span></span></div>
+</section>
+
+<script>
+// 画面履歴スタック（戻る＝ESC/パンくず＝出典どおりの正典）
+var hist=[];
+function cur(){return [...document.querySelectorAll('.screen')].find(s=>!s.classList.contains('hidden'));}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');window.scrollTo(0,0);}
+function go(id){var c=cur();if(c)hist.push(c.id);show(id);}      // 進む
+function back(){if(hist.length)show(hist.pop());}                 // 戻る（ESC/パンくず）
+// ESC＝前の画面に戻る（UEFIガイド「Esc - 前の画面に戻ります」）
+document.addEventListener('keydown',function(e){if(e.key==='Escape')back();});
+// 上部パンくずクリックでも戻れる（ナビゲーション履歴）
+document.querySelectorAll('.crumbs').forEach(function(cb){cb.style.cursor='pointer';
+  cb.addEventListener('click',back);});
+</script>
+</body>
+</html>

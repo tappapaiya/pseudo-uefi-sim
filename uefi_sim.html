@@ -1,0 +1,2726 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- レイアウト幅を1024pxに固定：スマホでは全体が縮小表示され、ピンチ拡大で操作できる（画面幅に合わせて縮んで潰れるのを防ぐ）。PCは従来どおり。 -->
+<meta name="viewport" content="width=1024">
+<title>擬似UEFI システムユーティリティ（RAID/BIOS/iLO/OSインストール）— DL320 Gen11 / MR408i-o</title>
+<style>
+  :root{
+    --bar:#3c4a54;        /* キャプションバー */
+    --bar2:#4a5a66;       /* パンくず */
+    --green:#3f7d68;      /* 左の緑パネル */
+    --hl:#00a982;         /* HPEグリーン ハイライト */
+    --taupe:#6d6055;      /* キー凡例パネル */
+    --ink:#1c1e24; --line:#c9ced6; --field:#ffffff; --fieldg:#eef1f4;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#20262b;color:var(--ink);
+    font-family:"Segoe UI","Hiragino Kaku Gothic ProN",system-ui,sans-serif;}
+  .note{max-width:1024px;margin:10px auto 6px;color:#9fb0bd;font-size:12px;padding:0 8px;line-height:1.6;}
+  .note b{color:#cfe6dc;}
+  .screen{width:1024px;max-width:100%;aspect-ratio:4 / 3;margin:0 auto 24px;background:#fff;position:relative;
+    box-shadow:0 4px 20px rgba(0,0,0,.4);display:flex;flex-direction:column;overflow:auto;}
+  /* コンソール(モニター)比率4:3で固定。中身がはみ出す画面は枠内でスクロール。 */
+  .screen > .cap, .screen > .crumbs, .screen > .foot,
+  .screen > .iptop, .screen > .ipbanner, .screen > .iprss{flex:0 0 auto;}
+  .bodyrow{min-height:0;}
+  .main, .post, .ipbody, .fwmode, .sum{min-height:0;overflow:auto;}
+  /* --- キャプションバー --- */
+  .cap{background:var(--bar);color:#fff;display:flex;align-items:center;gap:14px;padding:10px 16px;}
+  .cap .logo{width:40px;height:16px;border:2px solid #00a982;border-top:none;border-left:none;
+    box-shadow:inset 0 6px 0 -3px #00a982;}
+  .cap h1{font-size:20px;margin:0;font-weight:600;flex:1;letter-spacing:.02em;}
+  .cap .icons{display:flex;gap:14px;font-size:15px;opacity:.9;}
+  /* --- パンくず(矢羽根) --- */
+  .crumbs{background:var(--bar2);display:flex;font-size:12.5px;color:#dfe6ec;}
+  .crumbs .c{position:relative;padding:7px 22px 7px 26px;background:var(--bar2);}
+  .crumbs .c.nav{cursor:pointer;}
+  .crumbs .c.nav:hover{color:#7fe0c1;}
+  .crumbs .c.cur{color:#fff;font-weight:600;}
+  .crumbs .c::after{content:"";position:absolute;right:-9px;top:0;border-left:9px solid var(--bar2);
+    border-top:16px solid transparent;border-bottom:16px solid transparent;z-index:2;}
+  .crumbs .c::before{content:"";position:absolute;right:-11px;top:0;border-left:9px solid #2c3843;
+    border-top:16px solid transparent;border-bottom:16px solid transparent;z-index:1;}
+  .crumbs .c.home{padding-left:16px;}
+  /* --- 本体 --- */
+  .bodyrow{display:flex;flex:1;}
+  .side{width:270px;flex:0 0 270px;display:flex;flex-direction:column;}
+  .side .info{background:var(--green);color:#eafff6;padding:16px 16px 18px;font-size:12px;line-height:1.6;}
+  .side .info .model{font-size:19px;font-weight:700;color:#fff;line-height:1.2;margin-bottom:10px;}
+  .side .keys{background:var(--taupe);color:#f0ebe5;font-size:11.5px;padding:12px 16px;flex:1;line-height:1.9;}
+  .side .keys b{display:inline-block;width:44px;color:#fff;}
+  .main{flex:1;padding:18px 26px;}
+  .main h2{font-size:26px;margin:0 0 16px;font-weight:600;color:#2a2c31;}
+  /* フォーム行 */
+  .row{display:flex;align-items:center;gap:12px;padding:7px 6px;margin:0 -6px;cursor:default;}
+  .row:hover{background:#eef7f3;}
+  .row.sel{background:var(--hl);color:#fff;}
+  .row .lbl{flex:1;font-size:14px;font-weight:600;color:#2f7d68;}
+  .row.sel .lbl,.row.menu .lbl{color:inherit;}
+  .row.menu .lbl{color:#2a2c31;font-weight:600;}
+  .row.menu{cursor:pointer;}
+  .row.menu:hover{background:var(--hl);color:#fff;}
+  .row.menu:hover .lbl{color:#fff;}
+  .row.dim{cursor:not-allowed;}
+  .row.dim .lbl{color:#9aa2ab;}
+  .arrow{color:var(--hl);font-weight:700;}
+  .row.sel .arrow,.row.menu:hover .arrow{color:#fff;}
+  /* オンレール誘導ハイライト */
+  .rail{background:#e4f6ef;box-shadow:inset 3px 0 0 var(--hl);}
+  .rail::after{content:"◀ 次はここ";margin-left:10px;color:var(--hl);font-size:11px;font-weight:700;
+    align-self:center;animation:blink 1.3s ease-in-out infinite;}
+  @keyframes blink{0%,100%{opacity:.35}50%{opacity:1}}
+  /* 分岐（2択）の弱ハイライト */
+  .rail2{box-shadow:inset 3px 0 0 #b9d9cd;}
+  .hint{margin-left:10px;font-size:11px;font-weight:700;align-self:center;padding:1px 8px;border-radius:9px;}
+  .hint.hA{background:#e2f5ed;color:#127a56;}
+  .hint.hB{background:#fbeecf;color:#8a5a12;}
+  .hint.hC{background:#e0eefb;color:#1a5a8a;}
+  table.t tr.pick{background:var(--hl);color:#fff;cursor:pointer;}
+  /* 注記レイヤー（こちらが足したガイド＝実機画面には無い。青紫でUEFI配色と区別） */
+  .anno{margin:14px 0 4px;background:#eef1fb;border:1px solid #d3d9f0;border-left:4px solid #5b6bd6;
+    border-radius:4px;padding:8px 12px;font-size:12.5px;color:#37406b;line-height:1.65;}
+  .anno .k{display:inline-block;background:#5b6bd6;color:#fff;font-size:10px;font-weight:700;
+    padding:1px 8px;border-radius:9px;margin-right:8px;letter-spacing:.03em;}
+  .anno b{color:#2a3170;}
+  .anno a{color:#3a49c0;cursor:pointer;font-weight:700;text-decoration:none;}
+  .anno a:hover{text-decoration:underline;}
+  /* ガイド用ボタン（実UEFI行ではない“次へ”ナビ） */
+  .gbtn{display:inline-flex;align-items:center;gap:8px;margin-top:8px;background:#eef1fb;
+    border:1px dashed #5b6bd6;color:#37406b;font-weight:700;font-size:13px;padding:8px 14px;
+    border-radius:4px;cursor:pointer;}
+  .gbtn:hover{background:#5b6bd6;color:#fff;}
+  .gbtn .k{font-size:10px;background:#5b6bd6;color:#fff;padding:1px 7px;border-radius:8px;}
+  .gbtn:hover .k{background:#fff;color:#5b6bd6;}
+  /* コントロール */
+  .ctl{width:340px;flex:0 0 340px;}
+  select,input{width:100%;padding:6px 8px;border:1px solid var(--line);background:var(--field);
+    font-size:13px;font-family:inherit;border-radius:2px;}
+  .ctl.dim input,.ctl.dim select{background:var(--fieldg);color:#9aa2ab;}
+  .sub{color:#5b6470;font-size:13px;margin:2px 0 14px;}
+  .grp{margin-top:14px;font-weight:700;color:#2a2c31;font-size:12.5px;letter-spacing:.03em;}
+  .chk{display:flex;align-items:center;gap:10px;padding:6px;font-size:13.5px;}
+  .chk input{width:auto;}
+  .chk.dis{color:#9aa2ab;}
+  /* テーブル(論理ドライブ/物理ドライブ表示) */
+  table.t{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px;}
+  table.t th,table.t td{border:1px solid #d5dbe1;padding:6px 8px;text-align:left;}
+  table.t th{background:#eef1f4;color:#3a434c;font-weight:600;}
+  table.t tr.pick{background:var(--hl);color:#fff;cursor:pointer;}
+  .badge{display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px;font-weight:600;}
+  .b-ok{background:#d8f3e9;color:#127a56;}
+  .b-hs{background:#fde9c7;color:#8a5a12;}
+  /* --- 下部バー --- */
+  .foot{background:#e9edf1;border-top:1px solid var(--line);display:flex;align-items:center;
+    gap:16px;padding:8px 14px;font-size:12px;color:#5b6470;}
+  .foot .exit{border:1px solid #333;background:#fff;padding:5px 26px;font-weight:600;color:#222;cursor:pointer;}
+  .foot .rad{display:flex;align-items:center;gap:6px;}
+  .foot .rad::before{content:"";width:11px;height:11px;border:1px solid #9aa2ab;border-radius:50%;display:inline-block;}
+  .foot .rad.on::before{background:var(--hl);border-color:var(--hl);}
+  .foot .fk{margin-left:auto;display:flex;gap:8px;}
+  .foot .fk span{background:#dfe4e9;border:1px solid #c2c9d0;padding:5px 12px;border-radius:2px;cursor:pointer;}
+  .foot .fk span:hover{background:var(--hl);border-color:var(--hl);color:#fff;}
+  .hidden{display:none;}
+  /* POST */
+  .post{background:#000;color:#cfd6dd;font-family:Consolas,'SFMono-Regular',monospace;
+    font-size:13px;line-height:1.7;padding:22px 26px;flex:1;display:flex;flex-direction:column;}
+  @keyframes postfill{0%{width:3%}80%{width:92%}100%{width:100%}}
+  .postbar{height:100%;background:#00a982;width:3%;animation:postfill 5.5s cubic-bezier(.4,.1,.2,1) infinite;}
+  .fkey{cursor:pointer;}
+  .fkey b{background:#fff;color:#000;padding:2px 8px;border-radius:3px;}
+  .fkey.off b{background:none;border:1px solid #6b7681;color:#cfd6dd;}
+  /* --- ダイアログ overlay --- */
+  #overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;
+    justify-content:center;z-index:50;}
+  #overlay.on{display:flex;}
+  .dlg{background:#fff;width:520px;max-width:92%;box-shadow:0 10px 40px rgba(0,0,0,.5);
+    border-top:4px solid var(--hl);}
+  /* モード選択ダイアログは実写どおり横広（ほぼ正方形）に */
+  .dlg:has(.summode){width:800px;max-width:94%;}
+  .dlg .h{background:var(--bar);color:#fff;padding:10px 16px;font-size:15px;font-weight:600;}
+  .dlg .c{padding:20px 18px;font-size:14px;line-height:1.7;color:#2a2c31;}
+  .dlg .warn{color:#b23b2e;font-weight:700;}
+  .dlg .msg{font-size:14px;color:#2a2c31;line-height:1.6;}
+  .dlg .jp{margin-top:12px;background:#eef1fb;border-left:4px solid #5b6bd6;border-radius:4px;
+    padding:8px 11px;font-size:12px;color:#37406b;line-height:1.6;}
+  .dlg .jp .k{display:inline-block;background:#5b6bd6;color:#fff;font-size:9.5px;font-weight:700;
+    padding:1px 7px;border-radius:9px;margin-right:6px;letter-spacing:.03em;}
+  .dlg .jp b{color:#2a3170;}
+  .dlg .btns{display:flex;gap:10px;justify-content:flex-end;padding:0 18px 18px;}
+  .dlg .btns button{padding:7px 22px;font-size:13px;font-weight:600;border:1px solid #7a828b;
+    background:#f2f4f7;cursor:pointer;border-radius:2px;font-family:inherit;}
+  .dlg .btns button.pri{background:var(--hl);border-color:var(--hl);color:#fff;}
+  .dlg .chk{padding:4px 0;}
+  .toc{max-width:1024px;margin:0 auto 14px;padding:10px 14px;background:#2b333a;border:1px solid #3a444c;
+    border-radius:6px;color:#c7d2da;font-size:12px;line-height:1.9;}
+  .toc b{color:#7fe0c1;}
+  .toc a{color:#a9d9ff;text-decoration:none;cursor:pointer;}
+  .toc a:hover{text-decoration:underline;}
+  .toc .scline{padding:6px 0;border-bottom:1px solid #3a444c;}
+  .toc .jp{display:inline-block;margin-top:3px;color:#8697a3;}
+  .pill{display:inline-block;padding:1px 9px;border-radius:10px;font-weight:700;font-size:11px;color:#0d1a15;}
+  .pill.pA{background:#7fe0c1;}
+  .pill.pB{background:#f0c987;}
+  .pill.pC{background:#9ec9f0;}
+  .pill.pD{background:#c9b8e8;}
+  .pill.pE{background:#e8b8c4;}
+  /* ===== 手順D: Intelligent Provisioning（グラフィカルGUI／Gen11公式スクショ準拠） ===== */
+  .railb{outline:3px solid rgba(0,169,130,.55);outline-offset:2px;
+    animation:blink 1.3s ease-in-out infinite;border-radius:2px;}
+  .ipscreen{background:#fff;color:#2a2c31;}
+  .iptop{display:flex;align-items:center;gap:14px;padding:10px 18px;color:#fff;
+    background:linear-gradient(180deg,#18222a,#0e141a);}
+  .iptop .logo{width:40px;height:16px;border:2px solid #00a982;border-top:none;border-left:none;
+    box-shadow:inset 0 6px 0 -3px #00a982;}
+  .iptop .mdl{font-size:15px;font-weight:600;letter-spacing:.02em;}
+  .iptop .ic{margin-left:auto;display:flex;gap:16px;font-size:15px;opacity:.85;}
+  .ipbanner{position:relative;padding:30px 24px 26px;text-align:center;color:#fff;overflow:hidden;
+    background:radial-gradient(120% 150% at 50% 0%,#2c3b43 0%,#16202a 55%,#0b1116 100%);}
+  .ipbanner::before{content:"";position:absolute;inset:0;opacity:.5;
+    background:repeating-linear-gradient(90deg,rgba(0,169,130,.06) 0 2px,transparent 2px 30px);}
+  .ipbanner h2{position:relative;font-size:30px;font-weight:700;margin:0 0 8px;}
+  .ipbanner p{position:relative;font-size:13px;opacity:.85;margin:0;}
+  .ipbody{padding:20px 26px 26px;min-height:230px;}
+  .ipbtn{background:#00a982;color:#fff;font-weight:700;font-size:14px;border:none;padding:11px 30px;
+    cursor:pointer;border-radius:2px;font-family:inherit;}
+  .ipbtn:hover{background:#00c197;}
+  .ipbtn.ghost{background:transparent;border:1px solid #00a982;color:#0c8a68;}
+  .ipbtn.ghost:hover{background:#e4f6ef;}
+  .iprss{background:#f2f4f6;border-bottom:1px solid #dde2e7;padding:8px 22px;font-size:12.5px;color:#5b6470;}
+  .ipreview{display:flex;gap:20px;}
+  .ipnav{width:196px;flex:0 0 196px;font-size:13px;}
+  .ipnav .h{color:#5b6470;font-size:12px;margin:4px 0 8px;}
+  .ipnav a{display:block;padding:7px 10px;color:#2f7d68;cursor:pointer;border-radius:3px;font-weight:600;}
+  .ipnav a:hover{background:#eef7f3;}
+  .ipnav a.on{color:#127a56;background:#e4f6ef;box-shadow:inset 3px 0 0 #00a982;}
+  .ipnav a.dead{color:#9aa2ab;cursor:default;}
+  .ipnav a.dead:hover{background:none;}
+  .ipcontent{flex:1;min-width:0;}
+  .ipsec{background:#f6f8f9;padding:8px 12px;font-weight:700;color:#3a434c;margin:12px 0 6px;border-radius:3px;}
+  .ipkv{display:flex;padding:5px 12px;font-size:13.5px;}
+  .ipkv .k{width:190px;flex:0 0 190px;color:#5b6470;}
+  .ipkv .v{flex:1;color:#2a2c31;font-weight:600;}
+  .iptopbtns{display:flex;justify-content:flex-end;gap:10px;margin-bottom:8px;}
+  .ipsrc{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:6px 0;}
+  .ipsrc .card{width:150px;padding:16px 8px;text-align:center;cursor:pointer;
+    border:1px solid transparent;border-radius:4px;}
+  .ipsrc .card:hover{background:#eef7f3;}
+  .ipsrc .card.sel{border-color:#00a982;background:#e4f6ef;}
+  .ipsrc .card.dis{opacity:.4;cursor:not-allowed;}
+  .ipsrc .card.dis:hover{background:none;}
+  .ipsrc .ico{font-size:32px;line-height:1;}
+  .ipsrc .cl{font-size:12px;margin-top:8px;color:#3a434c;}
+  .iptog{display:inline-flex;align-items:center;gap:10px;font-size:13.5px;}
+  .iptog .sw{width:38px;height:20px;background:#00a982;border-radius:11px;position:relative;flex:0 0 38px;}
+  .iptog .sw.off{background:#c9ced6;}
+  .iptog .sw::after{content:"";position:absolute;top:2px;width:16px;height:16px;background:#fff;border-radius:50%;right:2px;}
+  .iptog .sw.off::after{right:auto;left:2px;}
+  .ippart input{width:120px;padding:5px 8px;border:1px solid #c9ced6;border-radius:2px;
+    font-family:inherit;font-size:13px;}
+  .ipbar{height:24px;border-radius:4px;
+    background:linear-gradient(90deg,#3a4a63 0 18%,#3f7d68 18% 44%,#6d6055 44% 58%,#dfe4e9 58% 100%);}
+  .ipjob{max-width:580px;margin:12px auto;}
+  .ipjob .jrow{display:flex;align-items:center;gap:12px;padding:12px 2px;
+    border-bottom:1px solid #eef1f4;font-size:13.5px;}
+  .ipprog{flex:1;height:8px;background:#e5e9ec;border-radius:5px;overflow:hidden;}
+  .ipprog i{display:block;height:100%;background:#00a982;width:45%;}
+  /* IPブートメニュー（00・グレー） */
+  .ipboot{background:#e9ebed;color:#2a2c31;flex:1;display:flex;flex-direction:column;min-height:520px;}
+  .ipboot .bhd{background:#d3d6d9;padding:10px 18px;display:flex;align-items:center;}
+  .ipboot .bhd .logo{width:40px;height:16px;border:2px solid #00a982;border-top:none;border-left:none;box-shadow:inset 0 6px 0 -3px #00a982;}
+  .ipboot .bhd .he{font-size:11px;color:#3a434c;line-height:1.05;margin-left:10px;font-weight:700;}
+  .ipboot .frame{flex:1;margin:14px;border:1px solid #b9bdc2;background:#eceef0;display:flex;flex-direction:column;justify-content:center;padding:0 12px;}
+  .ipboot .mi{padding:12px 22px;font-size:15px;font-weight:600;color:#2a2c31;cursor:pointer;}
+  .ipboot .mi.sel{background:#c9ccd0;}
+  .ipboot .mi:hover{background:#00a982;color:#fff;}
+  .ipboot .auto{margin:18px 12px 6px;background:#8a9098;color:#eef1f4;text-align:center;font-size:12px;padding:9px;}
+  .ipboot .cpy{padding:8px 18px;font-size:11px;color:#6b7681;border-top:1px solid #cfd3d7;}
+  /* IP初回セットアップ・スプラッシュ（01/02・ダーク） */
+  .ipsplash{position:relative;flex:1;min-height:520px;color:#fff;overflow:hidden;
+    background:linear-gradient(180deg,rgba(8,12,16,.62),rgba(8,12,16,.82)),
+      repeating-linear-gradient(90deg,#12181e 0 60px,#1a2129 60px 62px,#0d1217 62px 120px);}
+  .ipsplash .stop{display:flex;align-items:center;gap:14px;padding:12px 18px;}
+  .ipsplash .stop .logo{width:40px;height:16px;border:2px solid #00a982;border-top:none;border-left:none;box-shadow:inset 0 6px 0 -3px #00a982;}
+  .ipsplash .stop .mdl{font-size:14px;font-weight:600;}
+  .ipsplash .stop .ic{margin-left:auto;display:flex;gap:16px;font-size:15px;opacity:.85;position:relative;}
+  .ipsplash .lang{position:absolute;top:26px;right:0;background:#f2f4f6;color:#2a2c31;border-radius:3px;
+    box-shadow:0 4px 16px rgba(0,0,0,.4);min-width:130px;font-size:13px;z-index:3;}
+  .ipsplash .lang div{padding:8px 14px;cursor:pointer;}
+  .ipsplash .lang div.sel{border:2px solid #00a982;font-weight:700;}
+  .ipsplash .lang div:hover{background:#e4f6ef;}
+  .ipsplash .mid{text-align:center;padding:70px 0 0;}
+  .ipsplash .mid h2{font-size:34px;font-weight:700;margin:0 0 18px;}
+  .ipsplash .wz{display:inline-block;background:#00a982;color:#fff;font-weight:700;padding:9px 22px;font-size:14px;border-radius:2px;}
+  .ipsplash .skip{position:absolute;left:50%;transform:translateX(-50%);bottom:26px;
+    background:rgba(20,26,32,.72);border:1px solid rgba(255,255,255,.35);color:#fff;font-weight:700;
+    padding:10px 34px;font-size:14px;cursor:pointer;border-radius:2px;}
+  .ipsplash .skip:hover{background:#00a982;border-color:#00a982;}
+  /* ソース画面のファームレポジトリ・トースト（06/08） */
+  .iptoast{position:relative;max-width:340px;background:#e9ebed;color:#4a535b;font-size:11.5px;line-height:1.5;
+    padding:10px 34px 10px 12px;border-radius:3px;margin:14px auto 0;}
+  .iptoast .x{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#7a838c;}
+  .iptoast .w{color:#00a982;}
+  /* 準備画面（08） */
+  .ipprep{display:flex;gap:22px;padding:6px 4px;}
+  .ipprep .msg{flex:1;font-size:13.5px;line-height:1.85;color:#2a2c31;}
+  .ipprep .msg p{margin:0 0 14px;}
+  .ipbtn.warn{background:transparent;border:1px solid #d08a1a;color:#b5710f;}
+  .ipbtn.warn:hover{background:#fbf2e2;}
+  /* OS設定フォーム（10・2カラム＋ドロップダウン） */
+  .ipform{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px;padding:6px 2px;}
+  .ipfield{position:relative;}
+  .ipfield .lab{font-size:12px;color:#5b6470;margin:0 0 4px;}
+  .ipdd{border:1px solid #c9ced6;border-radius:2px;padding:8px 30px 8px 10px;font-size:13px;
+    background:#fff;position:relative;cursor:pointer;color:#2a2c31;}
+  .ipdd::after{content:"▾";position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#5b6470;}
+  .ipdd.act{border-color:#00a982;}
+  .ipddlist{border:1px solid #c9ced6;border-top:none;background:#fff;font-size:12.5px;max-height:132px;overflow:auto;
+    position:absolute;left:0;right:0;z-index:4;box-shadow:0 6px 16px rgba(0,0,0,.14);}
+  .ipddlist div{padding:8px 10px;cursor:pointer;}
+  .ipddlist div.sel{background:#e4f6ef;font-weight:700;}
+  .ipddlist div:hover{background:#eef7f3;}
+  .ippw{display:flex;align-items:center;border:1px solid #c9ced6;border-radius:2px;padding:8px 10px;font-size:13px;background:#fff;}
+  .ippw .eye{margin-left:auto;color:#5b6470;}
+  .ipfield.tog{display:flex;align-items:center;gap:10px;padding-top:18px;font-size:12.5px;color:#3a434c;}
+  /* メディア検証オーバーレイ（07） */
+  .ipverify{padding:26px 20px;text-align:center;}
+  .ipverify h3{font-size:22px;font-weight:700;margin:0 0 16px;}
+  .ipverify .line{height:2px;background:#2a2c31;margin:0 auto 8px;max-width:460px;}
+  .ipverify .cnt{font-size:15px;font-weight:700;}
+  /* 折りたたみ（上部の説明・目次をコンパクト化） */
+  details.note,details.toc{padding-top:8px;padding-bottom:8px;}
+  details.note>summary,details.toc>summary{cursor:pointer;list-style:none;font-weight:700;
+    display:flex;align-items:center;gap:8px;user-select:none;}
+  details.note>summary{color:#cfe6dc;font-size:12.5px;}
+  details.toc>summary{color:#7fe0c1;font-size:12.5px;}
+  details>summary::-webkit-details-marker{display:none;}
+  details>summary::before{content:"▶";font-size:10px;transition:transform .15s;color:#8fa0ac;}
+  details[open]>summary::before{transform:rotate(90deg);}
+  details.note>summary .pill,details.toc>summary .pill{font-size:10px;}
+  .toc .body{margin-top:8px;}
+  /* 独立リセットボタン（常時表示） */
+  .topbar{max-width:1024px;margin:10px auto 0;padding:0 2px;display:flex;justify-content:flex-end;}
+  .resetbtn{background:#3a444c;color:#c7d2da;border:1px solid #4a5560;font-family:inherit;
+    font-size:12px;font-weight:700;padding:6px 16px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .resetbtn:hover{background:#b23b2e;border-color:#b23b2e;color:#fff;}
+  /* ===== 手順E: ファーム更新（SUM モード選択 & Smart Update Manager） ===== */
+  /* 実写（SPH 7.45 起動USB, 2026-09-14）に合わせて白フレーム＋Copyrightフッタで再現 */
+  .fwmode{background:#fff;color:#2a2c31;flex:1;display:flex;flex-direction:column;min-height:520px;}
+  .fwmode .top{background:#ebebeb;border-bottom:1px solid #d7d7d7;padding:10px 18px;display:flex;align-items:center;gap:10px;}
+  .fwmode .top .logo{width:34px;height:14px;border:2px solid #00a982;border-top:none;border-left:none;box-shadow:inset 0 5px 0 -2px #00a982;}
+  .fwmode .top .he{font-size:11px;color:#33363b;line-height:1.1;font-weight:700;}
+  .fwmode .fwframe{flex:1;margin:14px;border:1px solid #c9ccd0;background:#fff;display:flex;}
+  .fwmode .mbody{padding:64px 60px;flex:1;}
+  .fwmode .fwfoot{padding:8px 18px;border-top:1px solid #e5e5e5;color:#6b7078;font-size:12px;}
+  /* 実写の見え方：ハイライト項目＝薄グレー地にグレー文字／非選択＝黒の太字 */
+  .fwmode .mi{padding:11px 18px;font-size:15px;cursor:pointer;color:#1f2226;font-weight:700;border:1px solid transparent;}
+  .fwmode .mi.sel{background:#e2e2e2;color:#6d7178;font-weight:600;}
+  .fwmode .mi:hover{background:#00a982;color:#fff;}
+  /* SLES起動シーケンス＝実写の時間進行を自動再生（枠付き黒コンソール→全画面黒→フェードインでHPE白スプラッシュ→緑バー） */
+  .fwboot{position:relative;flex:1;min-height:520px;background:#000;overflow:hidden;}
+  .fwboot .layer{position:absolute;inset:0;display:flex;flex-direction:column;}
+  .fwmono{font-family:"SFMono-Regular",Menlo,Consolas,"Courier New",monospace;font-size:13px;line-height:1.6;white-space:pre;}
+  .fwboot .cur{display:inline-block;width:8px;height:15px;background:#e8e8e8;vertical-align:-2px;animation:blink 1s steps(1) infinite;}
+  /* ①枠付き（実写02/03）：HPEグレーヘッダ＋白地に内側黒コンソール＋Copyrightフッタ */
+  .fwboot .lyr-framed{background:#fff;}
+  .fwboot .lyr-framed .top{background:#ebebeb;border-bottom:1px solid #d7d7d7;padding:10px 18px;display:flex;align-items:center;gap:10px;}
+  .fwboot .lyr-framed .top .logo{width:34px;height:14px;border:2px solid #00a982;border-top:none;border-left:none;box-shadow:inset 0 5px 0 -2px #00a982;}
+  .fwboot .lyr-framed .top .he{font-size:11px;color:#33363b;line-height:1.1;font-weight:700;}
+  .fwboot .lyr-framed .fwmid{flex:1;padding:14px;display:flex;}
+  .fwboot .lyr-framed .console{flex:1;background:#000;color:#e8e8e8;padding:12px 14px;overflow:hidden;}
+  .fwboot .lyr-framed .fwfoot{padding:8px 18px;border-top:1px solid #e5e5e5;color:#6b7078;font-size:12px;}
+  /* ②全画面黒（実写04）：Starting initrd... */
+  .fwboot .lyr-black{background:#000;color:#e8e8e8;padding:14px 16px;}
+  /* ③HPE白スプラッシュ（実写05/06）：黒からフェードイン */
+  .fwboot .lyr-splash{background:#fff;opacity:0;transition:opacity 1.3s ease;}
+  .fwboot .lyr-splash.show{opacity:1;}
+  /* ロゴ組（マーク＋ワードマーク）＝左揃えの塊を画面中央に。実測: マーク中心y≒38.5% */
+  .fwboot .sp{position:absolute;left:50%;top:33%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:flex-start;}
+  /* HPEマーク＝中空の緑長方形（実測360:98≒3.66:1・中に棒は無い） */
+  .fwboot .sp .hpe{width:154px;height:42px;border:6px solid #00a982;}
+  .fwboot .sp .wd{margin-top:14px;text-align:left;line-height:1.02;}
+  .fwboot .sp .wd b{font-size:27px;font-weight:800;color:#1f2226;display:block;}
+  .fwboot .sp .wd span{font-size:27px;font-weight:400;color:#1f2226;}
+  /* 進捗バー＝実測: 左19.3%/幅60%/中心y≒89%（画面下方）/高さ2.9%/フィル≒93% */
+  .fwboot .bar{position:absolute;left:19.3%;width:60%;top:87.6%;height:2.9%;min-height:10px;background:#eef0f2;box-shadow:2px 4px 5px rgba(0,0,0,.14);}
+  .fwboot .bar i{position:absolute;left:0;top:0;bottom:0;width:6%;background:#3ab88a;transition:width 1.4s ease;}
+  /* 再生/スキップの小コントロール（右上・常時クリック可） */
+  .fwboot .fwctl{position:absolute;top:8px;right:10px;z-index:5;display:flex;gap:6px;}
+  .fwboot .fwctl button{font-size:11px;padding:3px 9px;border:1px solid rgba(255,255,255,.55);background:rgba(0,0,0,.45);
+    color:#fff;border-radius:3px;cursor:pointer;}
+  .fwboot .fwctl button:hover{background:#00a982;border-color:#00a982;}
+  .fwboot .fwstat{position:absolute;left:12px;bottom:10px;z-index:5;font-size:11px;color:#fff;
+    background:rgba(0,0,0,.6);padding:2px 9px;border-radius:3px;max-width:calc(100% - 24px);}
+  .fwboot .fwstat:empty{display:none;}
+  /* ===== SUM本体GUI（実写: Smart Update Manager 12.6.0・日本語, 2026-09-14 SPH 7.45） ===== */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .sum{background:#fff;flex:1;display:flex;flex-direction:column;min-height:520px;}
+  /* 白ヘッダ＋緑HPEマーク＋バージョン＋右アイコン（緑の下線アクセント） */
+  .sum .hd{background:#fff;color:#33363b;display:flex;align-items:center;gap:10px;padding:12px 18px;font-size:14px;border-bottom:2px solid #00a982;}
+  .sum .hd .logo{width:30px;height:12px;border:2px solid #00a982;border-top:none;border-left:none;box-shadow:inset 0 4px 0 -2px #00a982;}
+  .sum .hd .ver{font-weight:600;}
+  .sum .hd .ic{margin-left:auto;color:#9aa2a9;font-size:15px;letter-spacing:7px;}
+  .sum .sub{background:#fff;border-bottom:1px solid #e3e7eb;padding:12px 20px;font-weight:700;font-size:20px;color:#2a2c31;display:flex;align-items:center;}
+  .sum .sub .act{margin-left:auto;font-size:12px;color:#3a434c;font-weight:600;border:1px solid #cdd3d9;border-radius:3px;padding:5px 12px;}
+  .sum .steps{display:flex;gap:3px;padding:14px 18px 6px;}
+  .sum .st{flex:1;background:#c9ced6;color:#6b7681;padding:12px 8px;text-align:center;font-weight:700;font-size:16px;
+    clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%,14px 50%);}
+  .sum .st:first-child{clip-path:polygon(0 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,0 100%);}
+  .sum .st.on{background:#00a982;color:#fff;}
+  .sum .st small{display:block;font-weight:400;font-size:11px;margin-top:3px;opacity:.9;}
+  .sum .body{padding:14px 20px 8px;font-size:13px;color:#2a2c31;flex:1;}
+  .sum .sumfoot{padding:8px 18px;text-align:right;color:#9aa2a9;font-size:11px;border-top:1px solid #eef0f2;}
+  /* ホーム：ようこそ＋オプション3カード */
+  .sum .welc{text-align:center;font-size:22px;font-weight:700;color:#2a2c31;margin:26px 0 22px;}
+  .sum .cards{border:1px solid #dfe3e7;max-width:660px;margin:0 auto;padding:22px 10px 28px;}
+  .sum .cards .ct{text-align:center;font-weight:700;color:#3a434c;margin-bottom:18px;}
+  .sum .crow{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;}
+  .sum .card{width:172px;text-align:center;}
+  .sum .card.click{cursor:pointer;}
+  .sum .card.click:hover .cic{transform:scale(1.06);box-shadow:0 3px 10px rgba(0,169,130,.4);}
+  .sum .card .cic{width:66px;height:66px;border-radius:50%;background:#00a982;color:#fff;display:flex;
+    align-items:center;justify-content:center;margin:0 auto 10px;font-size:23px;transition:.15s;}
+  .sum .card .cnm{font-weight:700;color:#2a2c31;margin-bottom:6px;font-size:13.5px;}
+  .sum .card .cds{font-size:11.5px;color:#6b7681;line-height:1.5;}
+  /* 手順1 インベントリ：アコーディオン見出し＋行 */
+  .sum .acc{padding:8px 4px;border-bottom:1px solid #e6e9ec;font-weight:600;color:#3a434c;margin-top:8px;}
+  .sum .acc::before{content:"▾ ";color:#00a982;}
+  .sum .invrow{display:flex;align-items:center;gap:14px;padding:16px 6px;font-size:13px;flex-wrap:wrap;}
+  .sum .invrow .sq{width:13px;height:13px;background:#00a982;flex:none;}
+  .sum .invrow .sq.run{width:15px;height:15px;background:none;border-radius:50%;border:2px solid #00a982;border-top-color:transparent;animation:spin .8s linear infinite;}
+  .sum .invrow .nm{min-width:150px;font-weight:600;}
+  .sum .invrow .msg{color:#3a434c;}
+  .sum .invrow .sbar{width:150px;height:12px;background:#eef0f2;position:relative;flex:none;}
+  .sum .invrow .sbar i{position:absolute;left:0;top:0;bottom:0;background:#3ab88a;width:0;transition:width .8s ease;}
+  .sum .invrow .cnt{color:#3a434c;}
+  /* SUMネイティブ操作ボタン（次へ/中止/最初からやり直す/再起動＝薄緑） */
+  .sum .btns2{display:flex;gap:12px;margin:22px 0 8px;flex-wrap:wrap;}
+  .sum .sumbtn{background:#e4f6ef;color:#127a56;border:1px solid #b7d9cc;border-radius:3px;padding:7px 18px;
+    font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .sum .sumbtn:hover:not(:disabled){background:#00a982;color:#fff;border-color:#00a982;}
+  .sum .sumbtn:disabled{opacity:.4;cursor:not-allowed;}
+  .sum .sec{font-weight:700;margin:12px 0 4px;color:#2a2c31;}
+  .sum .warnbar{height:18px;background:#e4f6ef;border:1px solid #b7d9cc;border-radius:3px;margin:4px 0;}
+  /* モード選択ダイアログの中身 */
+  .summode{max-width:none;}
+  .summode .note{background:#fbfbe6;border:1px solid #e6e2a8;padding:12px 14px;font-size:12.5px;line-height:1.65;color:#4a4a2a;margin-bottom:16px;}
+  .summode h4{margin:16px 0 8px;font-size:14px;color:#2a2c31;font-weight:700;}
+  /* モードのラジオは横並び・改行なし */
+  .summode .moderow{display:flex;gap:30px;margin-bottom:4px;}
+  .summode .moderow label{display:inline-flex;align-items:center;gap:8px;font-size:13px;white-space:nowrap;}
+  /* 長文チェックボックスは左揃え・折返しあり（チェックは先頭固定） */
+  .summode label.chk{display:flex;align-items:flex-start;gap:8px;font-size:13px;line-height:1.6;color:#2a2c31;}
+  .summode label.chk input{flex:none;margin-top:3px;}
+  .summode input{cursor:pointer;}
+  .summode .warny{background:#fff6c8;padding:8px 10px;font-size:11.5px;line-height:1.6;color:#5a4d12;margin:8px 0;}
+  .summode .base{font-size:12px;color:#3a434c;line-height:1.6;}
+  /* ===== サンドボックス（自由試行モード） ===== */
+  .modebar{max-width:1024px;margin:10px auto 0;padding:0 2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .modebar .seg{display:flex;border:1px solid #4a5560;border-radius:7px;overflow:hidden;}
+  .modebar .seg button{background:#2b333a;color:#9fb0bd;border:none;font-family:inherit;font-size:12px;
+    font-weight:700;padding:7px 16px;cursor:pointer;}
+  .modebar .seg button.on{background:var(--hl);color:#04120d;}
+  .modebar .seg button:not(.on):hover{background:#3a444c;color:#cfe6dc;}
+  .modebar .tag{font-size:11px;color:#8697a3;}
+  .modebar .tag b{color:#e8b86a;}
+  .sbchip{display:inline-block;background:#e8b86a;color:#3a2a06;font-size:10px;font-weight:800;
+    padding:1px 8px;border-radius:9px;margin-left:10px;letter-spacing:.06em;vertical-align:middle;}
+  /* キーボードフォーカス（矢印キー移動） */
+  .kbfocus{outline:2px solid var(--hl);outline-offset:-2px;background:#e4f6ef!important;}
+  .kbfocus .lbl{color:#0c6a4e!important;}
+  /* 実機に存在するが本サンドボックス未対応＝残すがリンクしない項目（灰色・ホバー無効） */
+  .row.menu.inert{cursor:default;}
+  .row.menu.inert:hover{background:transparent;}
+  .row.menu.inert:hover .lbl{color:#8a929b;}
+  .row.menu.inert .lbl{color:#8a929b;font-weight:600;}
+  .row.menu.inert .arrow{color:#d2d7dd;}
+  /* HII テーブル内のインライン編集コントロール（実機部品に合わせる） */
+  table.t td select,table.t td input{width:100%;padding:4px 6px;font-size:12px;border:1px solid var(--line);
+    background:var(--field);border-radius:2px;font-family:inherit;}
+  .rmv{color:#5b6470;cursor:pointer;font-weight:600;font-size:12px;white-space:nowrap;}
+  .rmv:hover{color:#b23b2e;text-decoration:underline;}
+  /* 起動順の ▲▼（下部バーの Fキー風・実機トーン） */
+  .mvbtn{display:inline-block;border:1px solid #c2c9d0;background:#dfe4e9;border-radius:2px;cursor:pointer;
+    font-size:12px;padding:1px 8px;margin-left:4px;font-family:inherit;color:#2a2c31;}
+  .mvbtn:hover:not([disabled]){background:var(--hl);color:#fff;border-color:var(--hl);}
+  .mvbtn[disabled]{opacity:.3;cursor:not-allowed;}
+  .b-fail{background:#f7dcd8;color:#a3392c;}
+  .b-jbod{background:#e6e9ec;color:#5b6470;}
+</style>
+</head>
+<body>
+
+  <div class="modebar">
+    <div class="seg">
+      <button id="modeRail" class="on" onclick="enterRail()">本番手順（オンレール）</button>
+      <button id="modeSb" onclick="enterSandbox()">🧪 サンドボックス（自由試行）</button>
+    </div>
+    <span style="margin-left:auto;display:flex;gap:8px">
+      <button id="sbDiskBtn" class="resetbtn" style="display:none;background:#2f5d4f;border-color:#3f7d68;color:#d8f3e9" onclick="go('sb_diskcfg')" title="サンドボックス専用：仮想ドライブの本数・容量・種別を編集">🧪 ドライブ構成</button>
+      <button class="resetbtn" onclick="resetCurrent()" title="現在のモードを初期状態に戻します">🔄 リセット</button>
+    </span>
+  </div>
+
+  <div id="stage"></div>
+
+  <div id="overlay"><div class="dlg" id="dlg"></div></div>
+
+  <div class="helpwrap">
+  <details class="note">
+    <summary>⚠ 擬似・参考用シミュレータ — 使い方・キー操作・画面の見方（クリックで開く）</summary>
+    ⚠ <b>擬似・参考用シミュレータ</b>（HPE ProLiant DL320 Gen11 / MR408i-o Gen11 の UEFIシステムユーティリティを再現）。
+    実機・ファームウェア版により項目名・既定値・遷移は細部が異なります。<b>操作イメージ・練習用</b>で、実機スクショが撮れたら差し替え前提。<br>
+    操作：緑の「<b>◀ 次はここ</b>」を順にクリックすると RAID作成〜グローバルホットスペア指定まで通しで進みます。
+    <b>戻る＝ESCキー</b>／上部パンくずクリック（実機準拠）。<br>
+    キー：<b>F9</b>＝System Utilities起動〔手順A〜C〕／<b>F10</b>＝Intelligent Provisioning起動〔手順D・OSインストール〕（いずれもPOST時）／<b>F7</b>＝既定値／<b>F10</b>＝保存（ユーティリティ内）／<b>F12</b>＝保存して終了・再起動。下部バーのボタンでも同じ操作可。<br>
+    <b>手順D（IP）はグラフィカルGUI</b>（UEFIの青画面とは別物）。DL385 Gen11のHPE公式スクショに準拠し、本機構成（MR408i-o／HDD／WS2022／日本語）に合わせた擬似再現です。<br>
+    <b>🧪 サンドボックス（自由試行）モード</b>（上部の切替ボタン）：検証済みの本番手順とは別に、<b>ドライブ本数（2〜10本）・容量・種別を自由に変えて RAID 0/1/5/10 を試作</b>できるデータ駆動モードです。本数不足など要件を満たさない選択はエラー表示（実機同様）。BIOS（System/Power/Boot Order/Security）や System Information も編集・確認できます。<b>矢印キーでフォーカス移動・Enterで決定</b>にも対応。※こちらは自由試行用の擬似で、実素材との1:1縛りは外しています。
+    ※ブラウザによっては F12 が開発者ツールに取られるため、下部バーの「F12: Save and Exit」ボタン推奨。左下 Exit の厳密な挙動は実機で要確認。<br>
+    <b>画面の見方</b>：白い枠内のメニュー・項目名は<b>実機どおり英語</b>。<span style="color:#7f8fe0;font-weight:700">青紫の枠（操作メモ）</span>と緑の「◀ 次はここ」は<b>こちらが足した日本語ガイド</b>で、実機画面には表示されません。
+  </details>
+
+  <details class="toc">
+    <summary>📖 手順A〜E 目次・画面ジャンプ（クリックで開く）</summary>
+    <div class="body">
+    <div class="scline"><span class="pill pA">手順A</span> <b>RAID構成</b>（第1章）：
+      ① RAID1（SLOT0+1＝OS）→ ② RAID0（SLOT2＝データ）→ ③ グローバルホットスペア（SLOT3）。<br>
+      <span class="jp">
+        <a onclick="jump('post')">POST</a> ›
+        <a onclick="jump('sysutil')">System Utilities</a> ›
+        <a onclick="jump('sysconfig')">System Configuration</a> ›
+        <a onclick="jump('props')">MR PROPERTIES</a> ›
+        <a onclick="jump('mainmenu')">Main Menu</a> ›
+        <a onclick="jump('configmgmt')">Config Mgmt</a> ›
+        <a onclick="jump('create')">Create LD</a> ›
+        <a onclick="jump('drives')">Select Drives</a> ›
+        <a onclick="jump('ldmgmt')">作成後確認</a> ›
+        <a onclick="jump('drivemgmt')">Drive Mgmt</a> ›
+        <a onclick="jump('spare')">ホットスペア</a>
+      </span>
+    </div>
+    <div class="scline"><span class="pill pB">手順B</span> <b>BIOS設定</b>（第2章）：
+      ① Wake-On LAN → Disabled ／ ② Automatic Power-On → Always Power On（＋Secure Boot）。<br>
+      <span class="jp">
+        <a onclick="jump('sysconfig')">System Configuration</a> ›
+        <a onclick="jump('rbsu')">BIOS/RBSU</a> ›
+        <a onclick="jump('rbsu_sysopt')">System Options</a> ›
+        <a onclick="jump('rbsu_avail')">Server Availability</a> ›
+        <a onclick="jump('rbsu_security')">Server Security</a> ›
+        <a onclick="jump('rbsu_secureboot')">Secure Boot</a>
+      </span>
+    </div>
+    <div class="scline"><span class="pill pC">手順C</span> <b>iLO設定</b>（第3章 Step1）：
+      DHCP → Disabled ／ IP 169.254.0.2 ／ Subnet 255.255.0.0 ／ Gateway 空欄（UEFI側の固定IP設定）。<br>
+      <span class="jp">
+        <a onclick="jump('sysconfig')">System Configuration</a> ›
+        <a onclick="jump('ilo')">iLO 6 Config Utility</a> ›
+        <a onclick="jump('ilo_net')">Network Options</a>
+      </span>
+    </div>
+    <div class="scline"><span class="pill pD">手順D</span> <b>OSインストール（Intelligent Provisioning）</b>（第4章）：
+      起動メニュー→初回設定スキップ→Rapid Setup ①ソース(DVD)→②OS設定/パーティション→③構成の許可→インストール。<span style="color:#8697a3">※POSTで<b>F10</b>起動・グラフィカルGUI（UEFI外）</span><br>
+      <span class="jp">
+        <a onclick="jump('ip_boot')">起動メニュー</a> ›
+        <a onclick="jump('ip_splash')">初回設定/言語</a> ›
+        <a onclick="jump('ip_home')">IPホーム</a> ›
+        <a onclick="jump('ip_pref')">環境設定(言語)</a> ›
+        <a onclick="jump('ip_source')">① ソース選択</a> ›
+        <a onclick="jump('ip_prep')">構成の準備</a> ›
+        <a onclick="jump('ip_review')">概要/レビュー(③)</a> ›
+        <a onclick="jump('ip_os')">OS設定</a> ›
+        <a onclick="jump('ip_part')">パーティション</a> ›
+        <a onclick="jump('ip_install')">インストール</a>
+      </span>
+    </div>
+    <div class="scline" style="border:0"><span class="pill pE">手順E</span> <b>ファームウェア更新</b>（第3章／SPH・SUM）：
+      F11 One-Time Boot Menu → SPH起動USB → モード選択（<b>実写7.45</b>）→ SLES起動 → SUM 12.6.0（ホーム→ローカルホストガイドアップデート：手順1〜3）。<span style="color:#8697a3">※事前にSecure Boot無効・完了後に復元。POSTで<b>F11</b>起動</span><br>
+      <span class="jp">
+        <a onclick="jump('bootmenu')">One-Time Boot Menu(F11)</a> ›
+        <a onclick="jump('fw_mode')">モード選択(7.45)</a> ›
+        <a onclick="jump('fw_boot')">SLES起動（実写）</a> ›
+        <a onclick="jump('sum_home')">SUMホーム（実写）</a> ›
+        <a onclick="jump('sum1')">手順1 インベントリ（実写）</a> ›
+        <a onclick="jump('sum2')">手順2 レビュー(擬)</a> ›
+        <a onclick="jump('sum3')">手順3 展開(擬)</a>
+        ｜ 参考: <a onclick="jump('fw_auto')">Auto無人展開(予想)</a>
+      </span>
+    </div>
+    </div>
+  </details>
+  </div>
+
+<script>
+/* ============================================================
+   擬似UEFI シミュレータ — テンプレ生成エンジン
+   シェル(キャプションバー/パンくず/緑パネル+キー凡例/フッタ)は共通生成、
+   各画面は {h1, title, crumbs[], main, foot?} のデータだけを持つ。
+   ============================================================ */
+
+// 本機の値（1箇所で管理）
+const M = {
+  model:'ProLiant DL320 Gen11', sn:'XXXXXXXXX',
+  ilo:'169.254.0.2', iloMask:'255.255.0.0', rom:'U63 v1.32',
+  ctrl:'HPE MR408i-o Gen11', slot:'OCP Slot 14',
+  // 手順D（Intelligent Provisioning）用
+  os:'Microsoft Windows Server 2022 Standard (Desktop Experience)',
+  tz:'(GMT+09:00) 大阪、札幌、東京',
+  disk:'1.819 TB (HDD)', partMB:'102,400',
+  // 手順E（ファーム更新 / SUM）用
+  sumVer:'Smart Update Manager 12.6.0', usbLabel:'Rear USB 2 : USB DISK 3.0',
+  baseline:'Service Pack for HA8000V', compCount:'423'   // 実写(SPH 7.45)で確定＝ベースライン名／総コンポーネント数
+};
+
+// 状態（オンレールの進捗で表示が変わる）
+const state = {
+  raidCreated:false,    // RAID1(OS) 作成済み
+  raid0Created:false,   // RAID0(DATA) 作成済み
+  drivesPicked:false,   // 現パスで Select Drives 適用済み
+  spareAssigned:false,  // グローバルホットスペア指定済み
+  // BIOS
+  wol:'Enabled', autoPower:'Restore Last Power State', secureBoot:'Enabled',
+  // iLO
+  iloDhcp:'Enabled', iloIpSet:false,
+  // 手順D（Intelligent Provisioning）
+  ipLang:'English (US)', ipWizardSkipped:false, ipProxySkipped:false,
+  ipMediaVerified:false, ipPrepDone:false, ipOsDd:false,
+  ipSource:null, ipPartSet:false, ipAllowed:false,
+  // IP環境設定（メンテナンス→Preferences）
+  ipPrefLang:'English (US)', ipPrefTab:'basic', ipPrefDone:false,
+  // 手順E（ファーム更新 / SUM）
+  fwMode:null, fwDeployed:false,
+  // 保存/終了の状態
+  rebootRequired:false
+};
+// 現在の作成パス（1=RAID1/OS, 2=RAID0/DATA）
+function pass(){ return state.raidCreated ? 2 : 1; }
+function resetAll(){
+  state.raidCreated=state.raid0Created=state.drivesPicked=state.spareAssigned=false;
+  state.wol='Enabled'; state.autoPower='Restore Last Power State'; state.secureBoot='Enabled';
+  state.iloDhcp='Enabled'; state.iloIpSet=false; state.rebootRequired=false;
+  state.fwMode=null; state.fwDeployed=false;
+  ipReset();
+  hist=[]; render('post');
+}
+function ipReset(){ state.ipLang='English (US)'; state.ipWizardSkipped=false; state.ipProxySkipped=false;
+  state.ipMediaVerified=false; state.ipPrepDone=false; state.ipOsDd=false;
+  state.ipSource=null; state.ipPartSet=false; state.ipAllowed=false;
+  state.ipPrefLang='English (US)'; state.ipPrefTab='basic'; state.ipPrefDone=false; }
+
+// --- 共通パーツ ---
+function sidebar(){
+  return `<aside class="side">
+    <div class="info"><div class="model">HPE<br>${M.model}</div>
+      Server SN: ${M.sn}<br>iLO IPv4: ${M.ilo}<br>User Default: OFF<br>
+      Secure Boot: ${state.secureBoot}<br>System ROM: ${M.rom}</div>
+    <div class="keys"><b>Enter</b>Select<br><b>ESC</b>Exit<br><b>F1</b>Help<br>
+      <b>F7</b>Load Defaults<br><b>F10</b>Save<br><b>F12</b>Save and Exit</div>
+  </aside>`;
+}
+function footer(f){
+  f = f || {};
+  const pend = (f.pending) ? ' on' : '';
+  const reb  = (f.reboot || state.rebootRequired) ? ' on' : '';
+  return `<div class="foot">
+    <span class="exit" title="推定：変更を無視してメニューへ抜ける挙動と思われるが、実機未確認のため保留。本シミュレータでは暫定でESC相当（1つ戻る）。戻るはESC/パンくずが正典。" onclick="back()">Exit</span>
+    <span class="rad${pend}">Changes Pending</span>
+    <span class="rad${reb}">Reboot Required</span>
+    <span class="fk"><span onclick="keyF7()">F7: Load Defaults</span><span onclick="keyF10()">F10: Save</span><span onclick="keyF12()">F12: Save and Exit</span></span>
+  </div>`;
+}
+// パンくずの各項目 → 遷移先画面ID（実機同様、親項目クリックでその画面へジャンプ）
+const CRUMB_NAV = {
+  '🏠 System Utilities':'sysutil',
+  'System Configuration':'sysconfig',
+  [`Slot 14: ${M.ctrl}`]:'props',
+  'Main Menu':'mainmenu',
+  'Configuration Management':'configmgmt',
+  'Controller Management':'sb_ctrlmgmt',
+  'Advanced Controller Management':'sb_advctrl',
+  'Create Logical Drive':'create',
+  'Select Drives':'drives',
+  'Logical Drive Management':'ldmgmt',
+  'Drive Management':'drivemgmt',
+  'BIOS/Platform Configuration (RBSU)':'rbsu',
+  'System Options':'rbsu_sysopt',
+  'Server Availability':'rbsu_avail',
+  'Server Security':'rbsu_security',
+  'Secure Boot Settings':'rbsu_secureboot',
+  'iLO 6 Configuration Utility':'ilo',
+  'Network Options':'ilo_net',
+  'System Information':'sysinfo',
+  'Power and Performance Options':'sb_power',
+  'Boot Options':'sb_boot',
+  '🧪 Drive Configuration':'sb_diskcfg'
+};
+// パンくずクリック：履歴にあればそこまで巻き戻して遷移（＝ESCで正しく親へ戻れる）、無ければ通常遷移
+function crumbNav(id){
+  const i = hist.indexOf(id);
+  if(i>=0){ hist = hist.slice(0,i); render(id); }
+  else { go(id); }
+}
+function crumbsHtml(arr){
+  return `<div class="crumbs">` +
+    arr.map((c,i)=>{
+      const last = i===arr.length-1;
+      const to = CRUMB_NAV[c];
+      let cls = 'c'+(i===0?' home':'');
+      let attr = '';
+      if(last){ cls+=' cur'; }                                   // 現在地＝クリック不可
+      else if(to){ cls+=' nav'; attr=` onclick="crumbNav('${to}')"`; }  // 実機同様その画面へ
+      else { cls+=' nav'; attr=' onclick="back()"'; }            // マップ外(☰ More Forms等)は1つ戻る
+      return `<span class="${cls}"${attr}>${c}</span>`;
+    }).join('') + `</div>`;
+}
+function capBar(h1){
+  return `<div class="cap"><span class="logo"></span><h1>${h1}</h1>
+    <span class="icons">🔧 ? 🔍 🌐 ⟳ 🗄</span></div>`;
+}
+
+// HII画面のシェル生成
+function renderHii(s){
+  return `<section class="screen">
+    ${capBar(s.h1)}
+    ${crumbsHtml(s.crumbs)}
+    <div class="bodyrow">
+      ${sidebar()}
+      <div class="main">${s.title?`<h2>${s.title}</h2>`:''}${s.main}</div>
+    </div>
+    ${footer(s.foot)}
+  </section>`;
+}
+
+// POST画面（特殊）
+function renderPost(){
+  return `<section class="screen">
+    <div class="post">
+      <div style="font-size:26px;font-weight:700;color:#fff;letter-spacing:.03em;margin-bottom:14px;">HPE ProLiant</div>
+      <div style="height:10px;width:40%;border:1px solid #3a4a55;margin-bottom:16px;overflow:hidden;">
+        <div class="postbar"></div></div>
+      (C) Copyright 1982-2026 Hewlett Packard Enterprise Development LP<br>
+      HPE ${M.model}<br>
+      System ROM Version: ${M.rom} (03/23/2023)<br>
+      Serial Number: ${M.sn}<br><br>
+      Installed System Memory: 16 GB, Available System Memory: 16 GB<br>
+      1 Processor(s) detected, 8 total cores enabled<br>
+      Proc 1: Intel(R) Xeon(R) Bronze 3408U<br><br>
+      Secure Boot: ${state.secureBoot}<br>
+      Starting required devices. Please wait, this may take a few moments....<br><br>
+      <span style="color:#00a982;">iLO 6 IPv4: ${M.ilo}</span><br>
+      <div style="margin-top:auto;display:flex;gap:26px;padding-top:20px;font-size:13px;">
+        <span class="fkey" onclick="go('sysutil')"><b>F9</b> System Utilities</span>
+        <span class="fkey" onclick="go('ip_boot')"><b>F10</b> Intelligent Provisioning</span>
+        <span class="fkey" onclick="go('bootmenu')"><b>F11</b> Boot Menu</span>
+        <span class="fkey off"><b>F12</b> Network Boot</span>
+      </div>
+    </div>
+    <div class="foot"><span style="color:#5b6470;">POST Code : 0040 &nbsp;&nbsp;（<b>F9</b>＝System Utilities〔手順A〜C〕／<b>F10</b>＝Intelligent Provisioning〔手順D〕／<b>F11</b>＝One-Time Boot Menu〔手順E・ファーム更新〕）</span></div>
+  </section>`;
+}
+
+/* ============================================================
+   画面定義（オンレール順）
+   ============================================================ */
+const SCREENS = {
+
+  // 0. POST
+  post: { type:'post' },
+
+  // 1. System Utilities トップ
+  sysutil: { type:'hii', h1:'System Utilities',
+    crumbs:['🏠 System Utilities'],
+    main:`
+      <div class="row menu rail" onclick="go('sysconfig')"><span class="lbl">System Configuration</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">One-Time Boot Menu</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Embedded Applications</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">System Information</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">System Health</span><span class="arrow">➜</span></div>
+      <div class="row menu" style="margin-top:14px" onclick="rebootPrompt()"><span class="lbl">Exit and resume system boot</span></div>
+      <div class="row menu" onclick="rebootPrompt()"><span class="lbl">Reboot the System</span></div>` },
+
+  // 2. System Configuration 一覧（コントローラ選択）
+  sysconfig: { type:'hii', h1:'System Configuration',
+    crumbs:['🏠 System Utilities','System Configuration'],
+    title:'System Configuration',
+    main:'' /* 動的（分岐ヒント） */ },
+
+  // 3. MR Main Menu
+  mainmenu: { type:'hii', h1:'System Configuration',
+    crumbs:['🏠 System Utilities','System Configuration',`Slot 14: ${M.ctrl}`,'Main Menu'],
+    title:'Main Menu',
+    main:'' /* 動的：RAID作成後は Drive Management を rail に */ },
+
+  // 4. Configuration Management サブメニュー
+  configmgmt: { type:'hii', h1:'System Configuration',
+    crumbs:['🏠 System Utilities','Main Menu','Configuration Management'],
+    title:'Configuration Management',
+    main:`
+      <div class="row menu rail" onclick="go('create')"><span class="lbl">Create Logical Drive</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Make Unconfigured Good</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Clear Configuration</span><span class="arrow">➜</span></div>
+      <div class="anno"><span class="k">操作メモ</span>RAID作成は <b>Create Logical Drive</b>。<br>
+        <b>⚠ 現地要確認</b>：本シミュレータは新品4本が <b>Unconfigured Good</b> で認識される前提。もし実機で <b>JBOD</b> 表示の場合は、<b>Create Logical Drive を押した直後に「JBOD検出→Unconfigured Goodへ変換」画面が出る</b>（Check All→OK、Warning は Confirm→Yes）か、先に「Make Unconfigured Good」で変換してから作成する。<span style="font-size:11px">※同型 MR408i-o Gen11 の実機ではJBODで出た事例あり。</span></div>` },
+
+  // 5. Create Logical Drive フォーム
+  create: { type:'hii', h1:'System Configuration',
+    crumbs:['☰ More Forms','Main Menu','Configuration Management','Create Logical Drive'],
+    title:'Create Logical Drive',
+    main:'' /* 動的 */, foot:{pending:true} },
+
+  // 6. Select Drives
+  drives: { type:'hii', h1:'System Configuration',
+    crumbs:['☰ More Forms','Configuration Management','Create Logical Drive','Select Drives'],
+    title:'Select Drives',
+    main:`
+      <div class="row"><span class="lbl">Select Media Type</span><span class="ctl"><select><option>Both</option><option>HDD</option><option>SSD</option></select></span></div>
+      <div class="row"><span class="lbl">Select Interface Type</span><span class="ctl"><select><option>All</option><option>SATA</option><option>SAS</option></select></span></div>
+      <div class="grp">CHOOSE UNCONFIGURED DRIVES:</div>
+      <div class="chk"><input type="checkbox" checked> Port 1I, Box 1, Bay 1: SATA, HDD, 2TB, Unconfigured Good</div>
+      <div class="chk"><input type="checkbox" checked> Port 1I, Box 1, Bay 2: SATA, HDD, 2TB, Unconfigured Good</div>
+      <div class="chk"><input type="checkbox"> Port 1I, Box 1, Bay 3: SATA, HDD, 2TB, Unconfigured Good</div>
+      <div class="chk"><input type="checkbox"> Port 1I, Box 1, Bay 4: SATA, HDD, 2TB, Unconfigured Good</div>
+      <div class="row menu"><span class="lbl">Check All</span></div>
+      <div class="row menu"><span class="lbl">Uncheck All</span></div>
+      <div class="row menu rail" onclick="applyDrives()"><span class="lbl">Apply Changes</span><span class="arrow">➜</span></div>
+      <div class="anno"><span class="k">操作メモ</span>RAID1（OS）は <b>Bay 1 + Bay 2</b>（＝<b>SLOT0＋SLOT1</b>）の2本を選択 → 「Apply Changes」。データ用 RAID0 のパスでは <b>Bay 3（SLOT2）</b> を1本選択。<span style="font-size:11px">※Bay番号↔SLOT番号の対応は別冊付録B 図B-1参照。</span></div>` },
+
+  // 7. Logical Drive Management（作成後確認）
+  ldmgmt: { type:'hii', h1:'System Configuration',
+    crumbs:['🏠 System Utilities','Main Menu','Logical Drive Management'],
+    title:'Logical Drive Management',
+    main:'' /* 動的 */ },
+
+  // 8. Drive Management（物理ドライブ一覧）
+  drivemgmt: { type:'hii', h1:'System Configuration',
+    crumbs:['🏠 System Utilities','Main Menu','Drive Management'],
+    title:'Drive Management',
+    main:'' /* 動的 */ },
+
+  // 9. グローバルホットスペア指定（SLOT3）
+  spare: { type:'hii', h1:'System Configuration',
+    crumbs:['☰ More Forms','Drive Management','Port 1I, Box 1, Bay 4'],
+    title:'Drive: Port 1I, Box 1, Bay 4',
+    main:`
+      <div class="sub">SATA, HDD, 2TB, Unconfigured Good</div>
+      <div class="row sel"><span class="lbl">Operation</span>
+        <span class="ctl"><select id="op">
+          <option>Make JBOD</option>
+          <option>Make Unconfigured Good</option>
+          <option>Make Bootable Drive</option>
+          <option selected>Assign Global Spare Drive</option>
+          <option>Unassign Global Spare Drive</option>
+        </select></span></div>
+      <div class="row menu rail" onclick="assignSpare()"><span class="lbl">Go</span><span class="arrow">➜</span></div>
+      <div class="grp">DRIVE PROPERTIES:</div>
+      <div class="row dim"><span class="lbl">Status</span><span class="ctl dim"><input value="Unconfigured Good" readonly></span></div>
+      <div class="row dim"><span class="lbl">Size</span><span class="ctl dim"><input value="1.819 TB" readonly></span></div>
+      <div class="row dim"><span class="lbl">Model</span><span class="ctl dim"><input value="SATA HDD 2TB 7.2K 3.5in" readonly></span></div>` },
+
+  // 3'. MR コントローラ PROPERTIES（コントローラ選択直後・dl360-7準拠）
+  props: { type:'hii', h1:'System Configuration',
+    crumbs:['🏠 System Utilities','System Configuration',`Slot 14: ${M.ctrl}`],
+    title:'PROPERTIES',
+    main:'' /* 動的（配列/論理ドライブ数が状態で変わる） */ },
+
+  // ===== 手順B: BIOS/Platform Configuration (RBSU) =====
+  // B0. RBSU トップ
+  rbsu: { type:'hii', h1:'BIOS/Platform Configuration (RBSU)',
+    crumbs:['🏠 System Utilities','System Configuration','BIOS/Platform Configuration (RBSU)'],
+    title:'BIOS/Platform Configuration (RBSU)',
+    main:`
+      <div class="row menu rail" onclick="go('rbsu_sysopt')"><span class="lbl">System Options</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Processor Options</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Memory Options</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Boot Options</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Network Options</span><span class="arrow">➜</span></div>
+      <div class="row menu" onclick="go('rbsu_security')"><span class="lbl">Server Security</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Power and Performance Options</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Storage Options</span><span class="arrow">➜</span></div>
+      <div class="anno"><span class="k">操作メモ</span>設定①②（WoL／Automatic Power-On）は <b>System Options → Server Availability</b>。Secure Boot は <b>Server Security</b>。変更後は最後に <b>F10</b> で保存。</div>`,
+    foot:{pending:true} },
+
+  // B1. System Options
+  rbsu_sysopt: { type:'hii', h1:'BIOS/Platform Configuration (RBSU)',
+    crumbs:['🏠 System Utilities','BIOS/Platform Configuration (RBSU)','System Options'],
+    title:'System Options',
+    main:`
+      <div class="row menu"><span class="lbl">Boot Time Optimizations</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Serial Port Options</span><span class="arrow">➜</span></div>
+      <div class="row menu rail" onclick="go('rbsu_avail')"><span class="lbl">Server Availability</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Server Asset Information</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">USB Options</span><span class="arrow">➜</span></div>`,
+    foot:{pending:true} },
+
+  // B2. Server Availability（WoL / Automatic Power-On）
+  rbsu_avail: { type:'hii', h1:'BIOS/Platform Configuration (RBSU)',
+    crumbs:['☰ More Forms','System Options','Server Availability'],
+    title:'Server Availability',
+    main:'' /* 動的（現在値を反映） */, foot:{pending:true} },
+
+  // B3. Server Security
+  rbsu_security: { type:'hii', h1:'BIOS/Platform Configuration (RBSU)',
+    crumbs:['🏠 System Utilities','BIOS/Platform Configuration (RBSU)','Server Security'],
+    title:'Server Security',
+    main:`
+      <div class="row menu"><span class="lbl">Set Power On Password</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Set Admin Password</span><span class="arrow">➜</span></div>
+      <div class="row menu rail" onclick="go('rbsu_secureboot')"><span class="lbl">Secure Boot Settings</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">TLS (HTTPS) Options</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">TPM 2.0 Configuration</span><span class="arrow">➜</span></div>
+      <div class="anno"><span class="k">操作メモ</span>ファームウェア一括更新（別章）の前に一時的に <b>Secure Boot → Disabled</b>、章末で <b>元の Enabled に必ず復元</b>。</div>`,
+    foot:{pending:true} },
+
+  // B4. Secure Boot Settings
+  rbsu_secureboot: { type:'hii', h1:'BIOS/Platform Configuration (RBSU)',
+    crumbs:['☰ More Forms','Server Security','Secure Boot Settings'],
+    title:'Secure Boot Settings',
+    main:'' /* 動的 */, foot:{pending:true} },
+
+  // ===== 手順C: iLO 6 Configuration Utility =====
+  // C0. iLO トップ
+  ilo: { type:'hii', h1:'iLO 6 Configuration Utility',
+    crumbs:['🏠 System Utilities','System Configuration','iLO 6 Configuration Utility'],
+    title:'iLO 6 Configuration Utility',
+    main:`
+      <div class="row menu rail" onclick="go('ilo_net')"><span class="lbl">Network Options</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Advanced Network Options</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">iLO 6 Configuration</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">User Management</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Setting Options</span><span class="arrow">➜</span></div>
+      <div class="row menu"><span class="lbl">Reset Options</span><span class="arrow">➜</span></div>
+      <div class="anno"><span class="k">操作メモ</span>キッティング用暫定IPは <b>Network Options</b> で設定。DHCP を無効化し、IP <b>169.254.0.2</b>／Subnet <b>255.255.0.0</b>／Gateway 空欄。保存は <b>F12</b>。</div>`,
+    foot:{pending:true} },
+
+  // C1. Network Options（DHCP無効→固定IP）
+  ilo_net: { type:'hii', h1:'iLO 6 Configuration Utility',
+    crumbs:['🏠 System Utilities','iLO 6 Configuration Utility','Network Options'],
+    title:'Network Options',
+    main:'' /* 動的 */, foot:{pending:true} },
+
+  // ===== 手順D: Intelligent Provisioning（type:'ip'＝グラフィカルGUI） =====
+  ip_boot:    { type:'ipboot', main:'' },
+  ip_splash:  { type:'ipsplash', main:'' },
+  ip_home:    { type:'ip', banner:{h2:'Intelligent Provisioning', p:'世界屈指の高度なサーバー構成ソフトウェア'}, main:'' },
+  ip_pref:    { type:'ip', rss:'Intelligent Provisioning Preferences（環境設定）', main:'' },
+  ip_source:  { type:'ip', banner:{h2:'Rapid Setup', p:'OSのインストールと構成をセットアップするための迅速でシンプルなプロセス'}, main:'' },
+  ip_prep:    { type:'ip', rss:'RSS &rsaquo; 構成の準備', main:'' },
+  ip_review:  { type:'ip', rss:'RSS &rsaquo; 概要およびインストール', main:'' },
+  ip_os:      { type:'ip', rss:'RSS &rsaquo; OS設定', main:'' },
+  ip_part:    { type:'ip', rss:'RSS &rsaquo; OSボリュームのパーティション', main:'' },
+  ip_install: { type:'ip', rss:'RSS &rsaquo; ジョブビューアー', main:'' },
+
+  // ===== 手順E: ファーム更新（F11→One-Time Boot Menu→SUM） =====
+  bootmenu: { type:'hii', h1:'Boot Menu', crumbs:['🏠 One-Time Boot Menu'], title:'One-Time Boot Menu', main:'' },
+  fw_mode:  { type:'fwmode', main:'' },
+  fw_boot:  { type:'fwboot', main:'' },
+  fw_auto:  { type:'fwmode', main:'' },
+  sum_home: { type:'sum', step:0, sumTitle:'ホーム', main:'' },
+  sum1: { type:'sum', step:1, sumTitle:'ローカルホストガイドアップデート', main:'' },
+  sum2: { type:'sum', step:2, sumTitle:'ローカルホストガイドアップデート', main:'' },
+  sum3: { type:'sum', step:3, sumTitle:'ローカルホストガイドアップデート', main:'' }
+};
+
+/* ---- 動的main（状態依存） ---- */
+function sysconfigMain(){
+  // 分岐：RAID構成(MRコントローラ) / BIOS設定(RBSU)
+  return `
+    <div class="row menu rail2" onclick="go('rbsu')"><span class="lbl">BIOS/Platform Configuration (RBSU)</span><span class="arrow">➜</span>
+      <span class="hint hB">手順B：BIOS設定</span></div>
+    <div class="row menu rail2" onclick="go('ilo')"><span class="lbl">iLO 6 Configuration Utility</span><span class="arrow">➜</span>
+      <span class="hint hC">手順C：iLO設定</span></div>
+    <div class="row menu rail2" onclick="go('props')"><span class="lbl">${M.slot}: ${M.ctrl}</span><span class="arrow">➜</span>
+      <span class="hint hA">手順A：RAID構成</span></div>
+    <div class="row menu"><span class="lbl">Embedded LOM 1 Port 1 : BCM 5720 - NIC</span><span class="arrow">➜</span></div>
+    <div class="row menu"><span class="lbl">Embedded LOM 1 Port 2 : BCM 5720 - NIC</span><span class="arrow">➜</span></div>`;
+}
+function propsMain(){
+  const arrays = (state.raidCreated?1:0) + (state.raid0Created?1:0);
+  const lds    = arrays;
+  const chk = arrays===0
+    ? `<div class="anno"><span class="k">操作メモ</span><b>現状確認</b>：<b>Arrays＝0 / Logical Drives＝0</b>＝アレイ未構築（新品）。<b>Drives＝4</b>（全数認識）・<b>JBODs＝0</b>（＝Unconfigured Good想定）。確認できたら <b>Main Menu</b> へ。</div>`
+    : `<div class="anno"><span class="k">操作メモ</span>作成の反映：<b>Arrays＝${arrays} / Logical Drives＝${lds}</b>。</div>`;
+  return `
+    <div class="row menu"><span class="lbl">Help</span></div>
+    <div class="grp">PROPERTIES:</div>
+    <div class="row dim"><span class="lbl">Status</span><span class="ctl dim"><input value="Optimal" readonly></span></div>
+    <div class="row dim"><span class="lbl">Backplane</span><span class="ctl dim"><input value="1" readonly></span></div>
+    <div class="row dim"><span class="lbl">Enclosure</span><span class="ctl dim"><input value="1" readonly></span></div>
+    <div class="row dim"><span class="lbl">Drives</span><span class="ctl dim"><input value="4" readonly></span></div>
+    <div class="row dim"><span class="lbl">JBODs</span><span class="ctl dim"><input value="0" readonly></span></div>
+    <div class="row dim"><span class="lbl">Arrays</span><span class="ctl dim"><input value="${arrays}" readonly></span></div>
+    <div class="row dim"><span class="lbl">Logical Drives</span><span class="ctl dim"><input value="${lds}" readonly></span></div>
+    <div class="row dim"><span class="lbl">ROC Temperature (C)</span><span class="ctl dim"><input value="55" readonly></span></div>
+    <div class="row menu rail" onclick="go('mainmenu')" style="margin-top:10px"><span class="lbl">Main Menu</span><span class="arrow">➜</span></div>
+    ${chk}`;
+}
+function mainmenuMain(){
+  const needCfg   = !(state.raidCreated && state.raid0Created);
+  const railCfg   = needCfg ? ' rail' : '';
+  const railDrive = state.raidCreated && state.raid0Created && !state.spareAssigned ? ' rail' : '';
+  return `
+    <div class="row menu${railCfg}" onclick="go('configmgmt')"><span class="lbl">Configuration Management</span><span class="arrow">➜</span></div>
+    <div class="row menu"><span class="lbl">Controller Management</span><span class="arrow">➜</span></div>
+    <div class="row menu" onclick="go('ldmgmt')"><span class="lbl">Logical Drive Management</span><span class="arrow">➜</span></div>
+    <div class="row menu${railDrive}" onclick="go('drivemgmt')"><span class="lbl">Drive Management</span><span class="arrow">➜</span></div>
+    <div class="row menu"><span class="lbl">Hardware Components</span><span class="arrow">➜</span></div>`;
+}
+function createMain(){
+  // pass1=RAID1/OS/Bay1+2, pass2=RAID0/DATA/Bay3
+  const p = pass();
+  // 実機の並びは RAID0/RAID1/RAID5…（装着ドライブ数で選択肢は絞られる）。今回のパスの目標levelをselected。
+  const tgt = p===1 ? 'RAID1' : 'RAID0';
+  const opt = v => `<option${v===tgt?' selected':''}>${v}</option>`;
+  const lvls = opt('RAID0')+opt('RAID1')+opt('RAID5')+opt('RAID6')+opt('RAID10');
+  const need = p===1 ? 'Bay 1 + Bay 2（RAID1／OS用）' : 'Bay 3（RAID0／DATA用）';
+  const picked = state.drivesPicked ? `✓ ${p===1?'2 drives':'1 drive'} selected` : '→ Select drives first';
+  return `
+    <div class="row menu" onclick="saveConfig()"><span class="lbl">Save Configuration</span><span class="arrow">➜</span></div>
+    <div class="row sel"><span class="lbl">Select RAID Level</span>
+      <span class="ctl"><select>${lvls}</select></span></div>
+    <div class="chk dis"><input type="checkbox" disabled> Secure Logical Drive</div>
+    <div class="row"><span class="lbl">Unmap Capability</span>
+      <span class="ctl"><select><option>Disabled</option><option>Enabled</option></select></span></div>
+    <div class="row"><span class="lbl">Select Drives From</span>
+      <span class="ctl"><select><option>Unconfigured Capacity</option><option>Free Capacity</option></select></span></div>
+    <div class="row menu" onclick="go('drives')"><span class="lbl">Select Drives</span><span class="arrow">➜</span>
+      <span style="color:var(--hl);font-size:11px;font-weight:700;margin-left:6px">${picked}</span></div>
+    <div class="grp">CONFIGURE LOGICAL DRIVE PARAMETERS:</div>
+    <div class="row"><span class="lbl">Logical Drive Name</span><span class="ctl"><input value="" placeholder="(空欄のままでOK)"></span></div>
+    <div class="row"><span class="lbl">Logical Drive Size</span><span class="ctl"><input value="1863.016"></span></div>
+    <div class="row"><span class="lbl">Logical Drive Size Unit</span><span class="ctl"><select><option>GiB</option><option>MiB</option><option>TiB</option></select></span></div>
+    <div class="row"><span class="lbl">Strip Size</span><span class="ctl"><select><option>256 KB</option><option>64 KB</option><option>128 KB</option></select></span></div>
+    <div class="row"><span class="lbl">Read Policy</span><span class="ctl"><select><option>No Read Ahead</option><option>Read Ahead</option></select></span></div>
+    <div class="row"><span class="lbl">Write Policy</span><span class="ctl"><select><option>Write Back</option><option>Write Through</option></select></span></div>
+    <div class="row"><span class="lbl">I/O Policy</span><span class="ctl"><select><option>Direct</option><option>Cached</option></select></span></div>
+    <div class="row"><span class="lbl">Access Policy</span><span class="ctl"><select><option>Read/Write</option><option>Read Only</option><option>Blocked</option></select></span></div>
+    <div class="row"><span class="lbl">Drive Cache</span><span class="ctl"><select><option>Unchanged</option><option>Enable</option><option>Disable</option></select></span></div>
+    <div class="row"><span class="lbl">Disable Background Initialization</span><span class="ctl"><select><option>No</option><option>Yes</option></select></span></div>
+    <div class="row"><span class="lbl">Default Initialization</span><span class="ctl"><select><option>No</option><option>Fast</option><option>Full</option></select></span></div>
+    <div class="row"><span class="lbl">Emulation Type</span><span class="ctl"><select><option>Default</option><option>Disabled</option><option>Forced</option></select></span></div>
+    <div class="row menu rail" onclick="saveConfig()"><span class="lbl">Save Configuration</span><span class="arrow">➜</span></div>
+    <div class="anno"><span class="k">操作メモ</span>今回のパス：<b>${p===1?'① RAID1（SLOT0+1＝OS用）':'② RAID0（SLOT2＝DATA用）'}</b>。
+      「Select Drives」で <b>${need}</b> を選択 → パラメータはこのまま → <b>一番下までスクロールして「Save Configuration」</b>をクリック。<br>
+      <span style="font-size:11px">※<b>Logical Drive Name は空欄でOK</b>（動画も未入力・自動でも入らない）。作成後は番号（Logical Drive 0/1）で管理される。「OS／DATA」はこの手順書での用途メモで、HIIに入力する必要はない。</span><br>
+      <span style="font-size:11px">※「Save Configuration」はフォーム最上部にもあるが、実際に押すのは全パラメータの下（この位置）。</span></div>`;
+}
+function ldmgmtMain(){
+  if(!state.raidCreated){
+    return `<div class="sub" style="margin-top:10px">Unable to display logical drive summary as there are no logical drives currently available.</div>
+      <div class="anno"><span class="k">操作メモ</span><b>現状確認</b>：論理ドライブは未作成（＝新品・アレイ未構築）。この表示が出ればRAIDは未構成と確認できます。Configuration Management から作成します。
+        <div class="gbtn" onclick="go('configmgmt')"><span class="k">次へ</span>Configuration Management で作成 ➜</div></div>`;
+  }
+  let rows = `<tr><td>Logical Drive 0</td><td>RAID1</td><td>1.819 TB</td><td>Bay 1, Bay 2</td><td style="color:#5b6bd6">OS用</td><td><span class="badge b-ok">Optimal</span></td></tr>`;
+  if(state.raid0Created) rows += `<tr><td>Logical Drive 1</td><td>RAID0</td><td>1.819 TB</td><td>Bay 3</td><td style="color:#5b6bd6">DATA用</td><td><span class="badge b-ok">Optimal</span></td></tr>`;
+  const anno = !state.raid0Created
+    ? `<div class="anno"><span class="k">操作メモ</span>RAID1（SLOT0+1＝OS）作成済み。次はデータ用 <b>RAID0（SLOT2＝Bay3）</b>。
+        <div class="gbtn" onclick="go('configmgmt')"><span class="k">次へ</span>② RAID0（DATA）を作成 ➜</div></div>`
+    : `<div class="anno"><span class="k">操作メモ</span>RAID1（OS）＋RAID0（DATA）作成済み。残るはグローバルホットスペア（SLOT3）。
+        <div class="gbtn" onclick="jump('mainmenu')"><span class="k">次へ</span>Main Menu → Drive Management でホットスペア指定 ➜</div></div>`;
+  return `
+    <table class="t">
+      <tr><th>Logical Drive</th><th>RAID</th><th>Size</th><th>Drives</th><th style="color:#5b6bd6">用途(メモ)</th><th>Status</th></tr>
+      ${rows}
+    </table>
+    ${anno}`;
+}
+function drivemgmtMain(){
+  const b12 = state.raidCreated
+    ? '<span class="badge b-ok">Online (RAID1)</span>'
+    : '<span class="badge b-ok">Unconfigured Good</span>';
+  const b3 = state.raid0Created
+    ? '<span class="badge b-ok">Online (RAID0)</span>'
+    : '<span class="badge b-ok">Unconfigured Good</span>';
+  const bay4status = state.spareAssigned
+    ? '<span class="badge b-hs">Global Hot Spare</span>'
+    : '<span class="badge b-ok">Unconfigured Good</span>';
+  const canSpare = state.raidCreated && state.raid0Created && !state.spareAssigned;
+  const bay4row = state.spareAssigned
+    ? `<tr><td>Port 1I, Box 1, Bay 4</td><td>SATA HDD 2TB</td><td>${bay4status}</td><td>—</td></tr>`
+    : `<tr class="${canSpare?'pick':''}" ${canSpare?`onclick="go('spare')"`:''}><td>Port 1I, Box 1, Bay 4</td><td>SATA HDD 2TB</td><td>${bay4status}</td><td>${canSpare?'▶ Select':'—'}</td></tr>`;
+  let hint;
+  if(state.spareAssigned) hint = '<div class="anno"><span class="k">操作メモ</span>✓ Bay 4（SLOT3）をグローバルホットスペアに指定済み。1次キッティングのRAID設定は完了。</div>';
+  else if(canSpare)       hint = '<div class="anno"><span class="k">操作メモ</span>ホットスペアにする <b>Bay 4（SLOT3）</b> の行をクリック → Operation で「Assign Global Spare Drive」。</div>';
+  else                    hint = '<div class="anno"><span class="k">操作メモ</span>先に RAID1（OS）と RAID0（DATA）を作成してからホットスペアを指定します。</div>';
+  return `
+    <table class="t">
+      <tr><th>Location</th><th>Model</th><th>Status</th><th></th></tr>
+      <tr><td>Port 1I, Box 1, Bay 1</td><td>SATA HDD 2TB</td><td>${b12}</td><td>—</td></tr>
+      <tr><td>Port 1I, Box 1, Bay 2</td><td>SATA HDD 2TB</td><td>${b12}</td><td>—</td></tr>
+      <tr><td>Port 1I, Box 1, Bay 3</td><td>SATA HDD 2TB</td><td>${b3}</td><td>—</td></tr>
+      ${bay4row}
+    </table>${hint}`;
+}
+/* ---- 動的main（BIOS） ---- */
+function availMain(){
+  const wolSel = v=>state.wol===v?' selected':'';
+  const apSel  = v=>state.autoPower===v?' selected':'';
+  const wolRail = state.wol!=='Disabled' ? ' rail' : '';
+  const apRail  = state.wol==='Disabled' && state.autoPower!=='Always Power On' ? ' rail' : '';
+  const done = state.wol==='Disabled' && state.autoPower==='Always Power On';
+  return `
+    <div class="row sel${wolRail}"><span class="lbl">Wake-On LAN</span>
+      <span class="ctl"><select onchange="setWol(this.value)">
+        <option${wolSel('Enabled')}>Enabled</option>
+        <option${wolSel('Disabled')}>Disabled</option></select></span></div>
+    <div class="row${apRail}"><span class="lbl">Automatic Power-On</span>
+      <span class="ctl"><select onchange="setAutoPower(this.value)">
+        <option${apSel('Restore Last Power State')}>Restore Last Power State</option>
+        <option${apSel('Always Power On')}>Always Power On</option>
+        <option${apSel('Always Power Off')}>Always Power Off</option></select></span></div>
+    <div class="row"><span class="lbl">Power-On Delay</span>
+      <span class="ctl"><select><option>No Delay</option><option>15 Second Delay</option></select></span></div>
+    <div class="row"><span class="lbl">POST F1 Prompt</span>
+      <span class="ctl"><select><option>Delayed 20 Seconds</option><option>Disabled</option></select></span></div>
+    <div class="anno"><span class="k">操作メモ</span>
+      設定① Wake-On LAN＝<b>${state.wol}</b>／設定② Automatic Power-On＝<b>${state.autoPower}</b>。
+      目標は WoL＝<b>Disabled</b>／Automatic Power-On＝<b>Always Power On</b>。${done?'両方そろったら <b>F10で保存</b>（下部バー or キー）。':'ドロップダウンで変更してください。'}
+      ${done?`<div class="gbtn" onclick="biosSave()"><span class="k">F10</span>変更を保存して再起動 ➜</div>`:''}
+    </div>`;
+}
+function secureBootMain(){
+  const sel = v=>state.secureBoot===v?' selected':'';
+  return `
+    <div class="row sel"><span class="lbl">Secure Boot Enforcement</span>
+      <span class="ctl"><select onchange="setSecureBoot(this.value)">
+        <option${sel('Enabled')}>Enabled</option>
+        <option${sel('Disabled')}>Disabled</option></select></span></div>
+    <div class="row menu"><span class="lbl">Advanced Secure Boot Options</span><span class="arrow">➜</span></div>
+    <div class="anno"><span class="k">操作メモ</span>現在値：<b>${state.secureBoot}</b>。ファームウェア一括更新の前だけ Disabled にし、<b>章末で必ず Enabled に復元</b>。変更したら ESC→RBSU→<b>F10保存</b>。
+      <div class="gbtn" onclick="biosSave()"><span class="k">F10</span>変更を保存して再起動 ➜</div></div>`;
+}
+function iloNetMain(){
+  const dhcpOff = state.iloDhcp==='Disabled';
+  const dim = dhcpOff ? '' : ' dim';                 // DHCP有効時はIP欄グレーアウト
+  const ipVal   = dhcpOff ? M.ilo     : '(auto)';
+  const maskVal = dhcpOff ? M.iloMask : '(auto)';
+  const gwVal   = dhcpOff ? ''        : '(auto)';
+  const ro = dhcpOff ? '' : ' readonly';
+  const done = dhcpOff;
+  return `
+    <div class="row dim"><span class="lbl">MAC Address</span><span class="ctl dim"><input value="A0:B3:CC:XX:XX:XX" readonly></span></div>
+    <div class="row"><span class="lbl">iLO 6 Configuration</span>
+      <span class="ctl"><select><option>Enabled</option><option>Disabled</option></select></span></div>
+    <div class="row sel"><span class="lbl">DHCP Enable</span>
+      <span class="ctl"><select onchange="setIloDhcp(this.value)">
+        <option${state.iloDhcp==='Enabled'?' selected':''}>Enabled</option>
+        <option${state.iloDhcp==='Disabled'?' selected':''}>Disabled</option></select></span></div>
+    <div class="row${dhcpOff?'':' dim'}"><span class="lbl">IP Address</span><span class="ctl${dim}"><input value="${ipVal}"${ro}></span></div>
+    <div class="row${dhcpOff?'':' dim'}"><span class="lbl">Subnet Mask</span><span class="ctl${dim}"><input value="${maskVal}"${ro}></span></div>
+    <div class="row${dhcpOff?'':' dim'}"><span class="lbl">Gateway IP Address</span><span class="ctl${dim}"><input value="${gwVal}" placeholder="(blank)"${ro}></span></div>
+    <div class="anno"><span class="k">操作メモ</span>
+      ${dhcpOff
+        ? `DHCP＝<b>Disabled</b>。IP <b>${M.ilo}</b>／Subnet <b>${M.iloMask}</b>／Gateway <b>空欄</b>を入力し、<b>F12</b>で保存。<br><span style="font-size:11px">※この暫定IPはサーバ本体OSと同一サブネット(APIPA)で直結アクセスする設計。設定書にiLO本番IP指定があればその値に。</span>
+           <div class="gbtn" onclick="iloSave()"><span class="k">F12</span>変更を保存（iLOリセット） ➜</div>`
+        : `まず <b>DHCP Enable</b> を <b>Disabled</b> に変更 → IP欄が入力可になります。`}
+    </div>`;
+}
+/* ---- iLO 操作 ---- */
+function setIloDhcp(v){ state.iloDhcp=v; render('ilo_net'); }
+function iloSave(){
+  showDlg(`<div class="h">Save Changes</div>
+    <div class="c"><div class="msg">Save the network settings? iLO will be reset to apply the changes.</div>
+      <div class="jp"><span class="k">操作メモ</span>DHCP：<b>${state.iloDhcp}</b>／IP：<b>${M.ilo}</b>／Subnet：<b>${M.iloMask}</b>／Gateway：<b>(空欄)</b>。保存するとiLOがリセットされます。</div></div>
+    <div class="btns">
+      <button onclick="hideDlg()">No</button>
+      <button class="pri" onclick="hideDlg();iloSaved()">Yes</button>
+    </div>`);
+}
+function iloSaved(){
+  state.iloIpSet = true;
+  showDlg(`<div class="h">Success</div>
+    <div class="c"><div class="msg">The changes are saved successfully. iLO is being reset.</div>
+      <div class="jp"><span class="k">操作メモ</span>iLO暫定IP（${M.ilo}）を設定しました。以降のブラウザ操作（https://${M.ilo}）はOSインストール後に実施します。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();render('ilo_net')">OK</button></div>`);
+}
+
+/* ============================================================
+   手順D: Intelligent Provisioning（GUI）— シェル・動的main・操作
+   ============================================================ */
+function ipTop(){
+  return `<div class="iptop"><span class="logo"></span><span class="mdl">${M.model}</span>
+    <span class="ic">🌐 🏠 🛒 ? ⓘ ⏻</span></div>`;
+}
+/* --- 00: IPブートメニュー（グレー） --- */
+function renderIpBoot(s){ return `<section class="screen">${ipBootMain()}</section>`; }
+function ipBootMain(){
+  return `<div class="ipboot">
+    <div class="bhd"><span class="logo"></span><span class="he">Hewlett Packard<br>Enterprise</span></div>
+    <div class="frame">
+      <div class="mi sel" onclick="go('ip_splash')">Intelligent Provisioning</div>
+      <div class="mi" onclick="ipBootNote('Smart Storage Administrator')">Smart Storage Administrator</div>
+      <div class="mi" onclick="ipBootNote('Server Hardware Diagnostics UEFI')">Server Hardware Diagnostics UEFI</div>
+      <div class="mi" onclick="ipBootNote('Server Hardware Diagnostics Full Test')">Server Hardware Diagnostics Full Test</div>
+      <div class="auto">The highlighted entry will be executed automatically in 8s.</div>
+    </div>
+    <div class="cpy">Copyright © 2011-2023 Hewlett Packard Enterprise Development LP</div>
+    <div class="anno"><span class="k">手順D</span>POSTで <b>F10</b> を押すと出る起動メニュー。先頭の <b>Intelligent Provisioning</b> を選択（8秒で自動選択）。<br>
+      <span style="font-size:11px">※Smart Storage Administrator は SR系コントローラー用。本機は <b>MR408i-o</b>（RAIDは手順AのF9/UEFIで作成済み）。診断2つはOSインストールでは使いません。</span></div>`;
+}
+function ipBootNote(name){
+  showDlg(`<div class="h">${name}</div>
+    <div class="c"><div class="msg">This entry is not used for the Windows installation flow.</div>
+      <div class="jp"><span class="k">操作メモ</span>OSインストールは先頭の <b>Intelligent Provisioning</b> を選びます。RAIDは手順A（F9側 UEFI）で作成済みなので、ここでは触りません。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();go('ip_splash')">Intelligent Provisioning を選ぶ</button></div>`);
+}
+/* --- 01/02: 初回セットアップ・スプラッシュ（ダーク） --- */
+function renderIpSplash(s){ return `<section class="screen">${ipSplashMain()}</section>`; }
+function ipSplashMain(){
+  const jp = state.ipLang==='日本語';
+  return `<div class="ipsplash">
+    <div class="stop"><span class="logo"></span><span class="mdl">${M.model}</span>
+      <span class="ic">🌐 ? ⓘ ⏻
+        <div class="lang">
+          <div class="${jp?'':'sel'}" onclick="ipPickLang('English (US)')">English (US)</div>
+          <div class="${jp?'sel':''}" onclick="ipPickLang('日本語')">日本語</div>
+          <div onclick="ipPickLang('中文')">中文</div>
+        </div></span></div>
+    <div class="mid">
+      <h2>Intelligent Provisioning</h2>
+      <span class="wz" onclick="ipWizardNote()">初期セットアップウィザード</span>
+    </div>
+    <div class="skip" onclick="ipSkipWizard()">スキップ</div>
+    <div class="anno"><span class="k">操作メモ</span>初回起動の言語・初期設定画面。右上の <b>🌐（地球アイコン）→ 日本語</b> を選び、下の <b>「スキップ」</b> で初期セットアップウィザードを飛ばします（本手順では不要）。<br>
+      <span style="font-size:11px">※「初期セットアップウィザード」は日付/ネットワーク等の初回構成。本案件はオフライン・OSインストールが目的なのでスキップでOK。${state.ipLang!=='日本語'?'<b style="color:#ffd08a">まず言語を日本語に。</b>':''}</span></div>`;
+}
+
+function renderIp(s){
+  return `<section class="screen ipscreen">
+    ${ipTop()}
+    ${s.banner ? `<div class="ipbanner"><h2>${s.banner.h2}</h2>${s.banner.p?`<p>${s.banner.p}</p>`:''}</div>`:''}
+    ${s.rss ? `<div class="iprss">${s.rss}</div>`:''}
+    <div class="ipbody">${s.main}</div>
+  </section>`;
+}
+function ipHomeMain(){
+  return `
+    <div style="text-align:center;padding:26px 0 14px;">
+      <button class="ipbtn railb" onclick="ipStartRapid()">Rapid Setup</button>
+      <button class="ipbtn ghost" style="margin-left:14px" onclick="ipMaintNote()">メンテナンスの実行</button>
+    </div>
+    <div class="anno"><span class="k">手順D</span>OSインストールは <b>Rapid Setup</b>（左）。以降
+      <b>①インストールソース選択 → ②インストール設定（OS設定・パーティション）→ ③設定のレビュー</b> の3段階（第4章）。<br>
+      <span style="font-size:11px">※これは <b>F10＝Intelligent Provisioning</b>（OSインストール）。RAID構成の <b>F9＝System Utilities</b>〔手順A〕とは別メニュー。<br>
+      💡 <b>Rapid Setupに入る前に、右の「メンテナンスの実行」→「Intelligent Provisioning環境設定」でIPの言語を日本語に</b>しておくと、以降の画面が日本語で進みます（初回起動時は自動で出ることもある同じ画面）。</span></div>`;
+}
+function ipSourceMain(){
+  const picked = state.ipSource==='DVD';
+  return `
+    <div class="ipsrc">
+      <div class="card ${picked?'sel':'railb'}" onclick="ipPickSource('DVD')"><div class="ico">💿</div><div class="cl">DVD構成</div></div>
+      <div class="card dis"><div class="ico">🖴</div><div class="cl">ファイルはUSBドライブにあります</div></div>
+      <div class="card dis"><div class="ico">🗄️</div><div class="cl">SMB/CIFS (Windows共有)</div></div>
+      <div class="card dis"><div class="ico">📄</div><div class="cl">FTPサイト</div></div>
+      <div class="card dis"><div class="ico">☁️</div><div class="cl">インターネットからOSをインストール</div></div>
+    </div>
+    <div class="iptoast"><span class="w">🔧</span> ファームウェアレポジトリに接続できません。ネットワーク構成およびプロキシ設定を確認してください。Rapid Setupを続行することはできますが、ファームウェアアップデートは実行できません。<span class="x">✕</span></div>
+    <div class="anno"><span class="k">操作メモ</span>① インストールソースの選択。本案件は <b>OS用DVD</b> → <b>「DVD構成」</b>を選択。<br>
+      ⚠ 「インターネットからOSをインストール」「更新／HPE.com」系は<b>選ばない</b>（完全オフライン環境。通信待ちで停止・失敗の元）。<br>
+      <span style="font-size:11px">※下のグレーの通知「ファームウェアレポジトリに接続できません…」は<b>オフラインなので正常</b>。ファーム更新は手順E（F11）で実施済み前提。ここは無視して進みます。</span>
+      ${picked?`<div class="gbtn" onclick="ipDvdConfig()"><span class="k">次へ</span>「DVD構成」ダイアログで媒体を確認して接続 ➜</div>`:''}</div>`;
+}
+function ipPrepMain(){
+  return `
+    <div class="ipreview">
+      <div class="ipnav">
+        <div style="font-weight:700;color:#2f7d68;margin-bottom:10px;">概要およびインストール</div>
+        <div class="h">詳細の表示/編集：</div>
+        <a class="dead">OS設定</a>
+        <a class="dead">ストレージコントローラー</a>
+        <a class="dead">OSボリュームのパーティション</a>
+        <a class="dead">ファームウェアアップデート</a>
+      </div>
+      <div class="ipcontent">
+        <div class="ipprep">
+          <div class="msg">
+            <p>このサーバーには<b>SmartアレイSRコントローラーが存在しない</b>ため、Rapid Setupは推奨アレイ設定を作成できません。</p>
+            <p>［続行］をクリックすると、Rapid Setupは残りの構成を準備しますが、Rapid SetupのダッシュボードからRAIDを手動で構成することはできません。</p>
+            <p>準備をキャンセルして Intelligent Provisioning に戻る場合は、［終了］をクリックします。</p>
+            <div style="display:flex;gap:12px;margin-top:10px;">
+              <button class="ipbtn warn" onclick="ipPrepExit()">終了</button>
+              <button class="ipbtn railb" onclick="ipPrepContinue()">続行</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="iptoast"><span class="w">🔧</span> ファームウェアレポジトリに接続できません。ネットワーク構成およびプロキシ設定を確認してください。Rapid Setupを続行することはできますが、ファームウェアアップデートは実行できません。<span class="x">✕</span></div>
+    <div class="anno"><span class="k">操作メモ・重要</span>この画面は<b>本機が正常</b>な証拠。本機のRAIDは <b>MR408i-o（MegaRAID系）</b>で、IPが自動構成できる <b>SmartアレイSR系ではない</b>ため「推奨アレイ設定を作成できません」と出ます。<br>
+      RAIDは<b>手順A（F9/UEFI）で作成済み</b>なので、ここは <b>［続行］</b> でOK（IP側でRAIDを作り直す必要はない）。<br>
+      <span style="font-size:11px">⚠ ［終了］を押すとホームに戻ってしまいます。RAIDが未作成でも、この画面ではなく<b>手順A</b>で作ります。IPの「Smartアレイ無し」表示はMR環境の正常動作です。</span></div>`;
+}
+function ipReviewMain(){
+  const done = state.ipPartSet;
+  return `
+    <div style="display:flex;align-items:center;margin-bottom:8px;">
+      <div style="font-weight:700;color:#2f7d68;font-size:15px;">概要およびインストール</div>
+      <div class="iptopbtns" style="margin-left:auto;margin-bottom:0;">
+        ${done?`<button class="ipbtn ghost" onclick="go('ip_part')">変更の取り消し</button>`:''}
+        <button class="ipbtn${done?' railb':''}" onclick="ipAllow()">構成の許可</button>
+      </div>
+    </div>
+    <div class="ipreview">
+      <div class="ipnav">
+        <div class="h">詳細の表示/編集：</div>
+        <a onclick="go('ip_os')">OS設定</a>
+        <a class="dead">ストレージコントローラー</a>
+        <a class="${done?'':'on'}" onclick="go('ip_part')">OSボリュームのパーティション</a>
+        <a class="dead">ファームウェアアップデート</a>
+      </div>
+      <div class="ipcontent">
+        <div class="ipsec">OS設定 <span style="color:#00a982;cursor:pointer;font-weight:700" onclick="go('ip_os')" title="クリックでOS設定の編集へ">✎</span></div>
+        <div class="ipkv"><span class="k">メディアソース</span><span class="v">DVD-ROM メディア</span></div>
+        <div class="ipkv"><span class="k">オペレーティングシステム</span><span class="v">${M.os}</span></div>
+        <div class="ipsec">ストレージコントローラー <span style="color:#00a982">✎</span></div>
+        <div style="padding:4px 12px;font-size:13px;line-height:1.9;color:#2a2c31;">
+          ブートコントローラー：<br>
+          &nbsp;• <b>${M.ctrl}</b><br>
+          &nbsp;&nbsp;&nbsp;○ OSボリューム<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▪ MR408i-o_Gen11-0065…26200<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${M.disk}（RAID-1）
+        </div>
+        <div class="ipsec">OSボリュームのパーティション <span style="color:#00a982;cursor:pointer;font-weight:700" onclick="go('ip_part')" title="クリックでOSボリュームのパーティション（サイズ調整）へ">✎</span></div>
+        <div class="ipkv"><span class="k">推奨パーティションの使用</span><span class="v">${done?'いいえ':'はい'}</span></div>
+        ${done?`<div class="ipkv"><span class="k">OSパーティション サイズ</span><span class="v">${M.partMB} MB</span></div>`:''}
+        <div class="ipsec">ファームウェアアップデート <span style="color:#00a982">✎</span></div>
+        <div class="ipkv"><span class="k">ファームウェアのアップデートの試行</span><span class="v">いいえ</span></div>
+      </div>
+    </div>
+    <div class="anno"><span class="k">操作メモ</span>③ 設定のレビュー。値を確認し、右上 <b>「構成の許可」</b> でインストール開始。
+      ${done
+        ? 'パーティションは指定済み。<b>構成の許可</b>で実行（新品なので消えるデータなし）。'
+        : '先に <b>「OSボリュームのパーティション」見出しの ✎（鉛筆）をクリック</b>→サイズ調整画面へ移り、C: に <b>'+M.partMB+' MB</b> を指定（未指定だとCに全容量が割り当てられる）。'}
+      ${done?'':`<div class="gbtn" onclick="go('ip_part')"><span class="k">次へ</span>✎ をクリックしてパーティションを指定 ➜</div>`}
+      <br><span style="font-size:11px">⚠ ファーム更新は「試行：いいえ」を維持（オフライン。更新系は通信待ちで停止/失敗の元）。ブートコントローラーは本機 ${M.ctrl} が表示（変更不可＝そのままでOK）。</span></div>`;
+}
+function ipOsMain(){
+  const dd=state.ipOsDd;
+  const osOpts=['Microsoft Windows Server 2022 Standard (Desktop Experience)',
+    'Microsoft Windows Server 2022 Standard Core',
+    'Microsoft Windows Server 2022 Datacenter (Desktop Experience)',
+    'Microsoft Windows Server 2022 Datacenter Core'];
+  return `
+    <div style="display:flex;align-items:center;margin-bottom:8px;">
+      <div style="font-weight:700;color:#2f7d68;font-size:15px;">概要およびインストール</div>
+      <div class="iptopbtns" style="margin-left:auto;margin-bottom:0;">
+        <button class="ipbtn ghost railb" onclick="back()">概要およびインストールに戻る</button></div>
+    </div>
+    <div class="ipsec">OS設定</div>
+    <div class="ipform">
+      <div class="ipfield">
+        <div class="lab">オペレーティングシステム</div>
+        <div class="ipdd ${dd?'act':''}" onclick="ipToggleOsDd()">${M.os}</div>
+        ${dd?`<div class="ipddlist">${osOpts.map(o=>`<div class="${o===M.os?'sel':''}" onclick="ipToggleOsDd()">${o}</div>`).join('')}</div>`:''}
+      </div>
+      <div class="ipfield"><div class="lab">OS言語</div><div class="ipdd">日本語</div></div>
+      <div class="ipfield"><div class="lab">OSキーボード</div><div class="ipdd">日本語</div></div>
+      <div class="ipfield"><div class="lab">タイムゾーン</div><div class="ipdd">${M.tz}</div></div>
+      <div class="ipfield"><div class="lab">コンピューター名</div><div class="ippw">（早見表の値）</div></div>
+      <div class="ipfield"><div class="lab">プロダクトキー</div><div class="ippw">（早見表の値）</div></div>
+      <div class="ipfield"><div class="lab">パスワード</div><div class="ippw">••••••••<span class="eye">👁</span></div></div>
+      <div class="ipfield"><div class="lab">パスワードの確認</div><div class="ippw">••••••••<span class="eye">👁</span></div></div>
+      <div class="ipfield tog"><span class="iptog"><span class="sw off"></span></span> HyperVロールをこのシステムにインストール</div>
+      <div class="ipfield tog"><span class="iptog"><span class="sw off"></span></span> Windowsファイアウォールの無効化</div>
+    </div>
+    <div class="anno"><span class="k">操作メモ</span>②a OS設定。<b>「オペレーティングシステム」ドロップダウン</b>で
+      <b>${M.os}</b> を選択（＝エディション選択もここ。Core/Datacenter等と間違えない）。OS言語・キーボード＝日本語、タイムゾーン＝${M.tz}。<br>
+      <b>コンピューター名／プロダクトキー／パスワードは早見表の指定値</b>を入力（自分で決めない。パスワードは8文字以上・大小英数記号）。HyperV／ファイアウォール無効化のトグルは<b>触らない（OFFのまま）</b>。<br>
+      <span style="font-size:11px">※ストレージコントローラーはこの画面には無い（本機MRは非SRでIPから構成不可＝手順AのRAIDが表示されるだけ）。エディション選択の独立画面も無く、上のドロップダウンが版により後半のWindowsセットアップ側「インストールするイメージの選択」に出ることもあるが、選ぶ値は同じ。</span>
+      <div class="gbtn" onclick="back()"><span class="k">戻る</span>概要およびインストールへ ➜</div></div>`;
+}
+function ipPartMain(){
+  const done = state.ipPartSet;
+  return `
+    <div class="iptopbtns"><button class="ipbtn ghost railb" onclick="back()">概要およびインストールに戻る（Back to Summary and Install）</button></div>
+    <div class="ipsec">OSボリュームのパーティション（OS Volume Partitions）</div>
+    <div style="padding:8px 12px;"><span class="iptog"><span class="sw off"></span> 推奨パーティションの使用（Use Recommended Partition）＝<b>OFF（手動で編集）</b></span></div>
+    <div style="padding:2px 12px 8px;font-size:12px;color:#5b6470;">Select the following drive to configure as OS drive（OS用ドライブを選択）</div>
+    <div style="margin:0 12px 6px;"><div class="ipdd" style="max-width:520px;">MR408i-o_Gen11-0065…26200 &nbsp; ${M.disk} ▾</div></div>
+    <div style="padding:2px 12px 6px;font-size:12px;color:#5b6470;">${done?'選択した OS ドライブに次のパーティションを構成します。':'All the partitions will be default configured by the selected operating system.（既定では選択OSがパーティションを自動構成）'}</div>
+    <div style="margin:6px 12px 10px;"><div class="ipbar"></div></div>
+    <table class="t">
+      <tr><th>マウントポイント<br><span style="font-weight:400;color:#8a929c;font-size:10px">Mount Point</span></th><th>サイズ (MB)<br><span style="font-weight:400;color:#8a929c;font-size:10px">Size (MB)</span></th><th>ファイルシステム<br><span style="font-weight:400;color:#8a929c;font-size:10px">File System</span></th><th>ラベル<br><span style="font-weight:400;color:#8a929c;font-size:10px">Partition Label</span></th><th>割合<br><span style="font-weight:400;color:#8a929c;font-size:10px">PERCENTAGE</span></th></tr>
+      <tr><td>Recovery</td><td>490</td><td>NTFS</td><td>—</td><td>—</td></tr>
+      <tr><td>EFI system partition</td><td>100</td><td>FAT32</td><td>—</td><td>—</td></tr>
+      <tr><td>Microsoft reserved partition</td><td>16</td><td>NTFS</td><td>—</td><td>—</td></tr>
+      <tr class="pick"><td>Basic data partition${done?'（C:）':''}</td>
+        <td class="ippart"><input id="partmb" value="${done?M.partMB:''}" placeholder="${M.partMB}"> <span style="color:#8a929c">▲▼</span></td>
+        <td>NTFS</td><td>${done?'OS':'—'}</td><td style="color:#8a929c">自動</td></tr>
+    </table>
+    <div style="margin-top:12px"><button class="ipbtn${done?' ghost':' railb'}" onclick="ipSetPart()">${done?'✓ アップデート済み':'アップデート（サイズ適用 / Update）'}</button></div>
+    <div class="anno"><span class="k">操作メモ</span>②c パーティション（この画面はレビューの「OSボリュームのパーティション ✎」から入る）。<b>推奨パーティションの使用（Use Recommended Partition）を OFF</b> にすると表が編集可能になり、<b>Basic data partition の「サイズ(MB)」がスピナー（▲▼）で編集可能</b>に。既定は全容量が1本（100%）なので、<b>${M.partMB} MB</b> に減らして「アップデート」。<br>
+      <span style="font-size:11px">※${M.partMB} MB ＝ 100×1024（＝100GB）。<b>本案件はC:を100GBに絞り、残りは未割り当てのまま</b>にしておき、<b>OS導入後に「ディスクの管理」でD:/S:/T:を作成（第6章）</b>。＝動画のように全容量をCへ割り当てない。未指定だとCに全容量割当になるので必ず数値入力。値は設定シートに従う。</span>
+      ${done?`<div class="gbtn" onclick="back()"><span class="k">次へ</span>概要およびインストールへ戻る ➜</div>`:''}</div>`;
+}
+function ipInstallMain(){
+  return `
+    <div class="ipjob">
+      <div class="ipsec">サーバーステータス</div>
+      <div class="jrow">⟳ サーバーは起動済み</div>
+      <div class="ipsec" style="margin-top:14px">ジョブステータス</div>
+      <div class="jrow">🚀 Express OS Install <span class="ipprog"><i></i></span> <span style="flex:0 0 44px;text-align:right">45%</span></div>
+      <div class="anno"><span class="k">操作メモ</span>③ インストール実行中。「ブートパーティションのフォーマット」→ファイルコピー→ドライバー適用→再起動…と自動進行（約20〜40分。自動再起動が数回入るが放置でOK）。<br>
+        途中の「テストされていないWindowsバージョン」「hpkeyclick」等のメッセージは<b>想定内・処置不要</b>。<br>
+        <span style="font-size:11px"><b>標準ドライバーは F10 IP が自動適用</b>＝この過程で WinPE が内蔵の HPE ドライバ一式（<code>hpdrvs</code>）を自動ロードするため、<b>ドライバーの場所を指定する画面は出ません</b>（SAS/SATA/NVMe・NIC・チップセット等）。デバイスマネージャーの「その他のデバイス」がほぼ出ないのはこのため。<b>最新SPP</b>の適用は別工程＝<b>手順E（iLO仮想メディアでSPP/SPH ISO→F11→Automatic SUM）</b>。<br>
+        ⚠ 完全オフライン＋本体マニュアル第4章の「SPHを別USBで指定」との整合は<b>実機確認事項</b>（内蔵ドライバで足りるか／SPH USBが要るか）。</span>
+        <div class="gbtn" onclick="ipDone()"><span class="k">完了</span>展開完了 → 再起動（Windowsセットアップへ）</div></div>
+    </div>`;
+}
+/* ---- 手順D 操作 ---- */
+function ipPickLang(v){ state.ipLang=v; render('ip_splash'); }
+function ipWizardNote(){
+  showDlg(`<div class="h">初期セットアップウィザード</div>
+    <div class="c"><div class="msg">日付・時刻・ネットワーク等をIP起動時に構成するウィザードです。</div>
+      <div class="jp"><span class="k">操作メモ</span>本案件はオフラインでOSインストールが目的のため、このウィザードは<b>スキップ</b>します（画面下の「スキップ」）。時刻等はOS側で設定。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();ipSkipWizard()">スキップする</button></div>`);
+}
+function ipSkipWizard(){
+  showDlg(`<div class="h">ウィザードをスキップ</div>
+    <div class="c"><div class="msg">よろしいですか? このステップをスキップすると、Intelligent Provisioning が完全には機能しない可能性があります。</div>
+      <div class="jp"><span class="k">操作メモ</span>OSインストール（Rapid Setup）には支障ありません。<b>「はい」</b>で進みます。</div></div>
+    <div class="btns"><button onclick="hideDlg()">キャンセル</button>
+      <button class="pri" onclick="hideDlg();state.ipWizardSkipped=true;go('ip_home')">はい</button></div>`);
+}
+function ipStartRapid(){
+  showDlg(`<div class="h">🔗 Webプロキシ構成</div>
+    <div class="c"><div class="msg">インターネットにアクセスするために、サーバーにWebプロキシサーバーが必要ですか? そうである場合は以下のWebプロキシ構成を入力してください。<br><br>
+      Webプロキシサーバー *　［http:// ␣␣␣␣␣␣␣␣␣␣␣］　ポート［␣␣␣␣］<br>
+      Webプロキシサーバー　　　［https:// ␣␣␣␣␣␣␣␣␣␣］　ポート［␣␣␣␣］</div>
+      <div class="jp"><span class="k">操作メモ</span>本案件は<b>完全オフライン＝プロキシ不要</b>。何も入力せず <b>「スキップ」</b> を押します（「接続」は使わない）。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();state.ipProxySkipped=true;go('ip_source')">スキップ</button>
+      <button onclick="hideDlg()">接続</button></div>`);
+}
+function ipDvdConfig(){
+  render('ip_source');
+  showDlg(`<div class="h">💿 DVD構成</div>
+    <div class="c">
+      <div style="border:1px solid #dde2e7;border-radius:3px;padding:10px 12px;display:flex;align-items:center;gap:12px;">
+        <span style="color:#00a982;font-size:18px;">◉</span>
+        <span style="color:#00a982;font-size:16px;">✅</span>
+        <span style="font-size:13px;line-height:1.4;"><b>DVD/CD-ROM メディア</b><br>
+          <span style="color:#5b6470;font-size:12px;">${M.os}</span></span>
+      </div>
+      <div class="jp"><span class="k">操作メモ</span>DVDを検出すると、その中の <b>OS（${M.os}）が自動で読み取られて</b>ここに表示されます（＝OS/エディションはゼロから手打ちしない）。内容を確認し <b>「接続」</b> を押します。<br>
+        <span style="font-size:11px">※媒体名は環境で変わります（物理光学ドライブ＝本案件 ／ iLO仮想メディア経由＝"iLO Virtual DVD-ROM"）。表示OSが違う場合はDVDの入れ間違い。</span></div>
+    </div>
+    <div class="btns"><button onclick="hideDlg()">キャンセル</button>
+      <button class="pri" onclick="hideDlg();ipVerify()">接続</button></div>`);
+}
+function ipVerify(){
+  render('ip_source');
+  showDlg(`<div class="h">メディアソースの検証中</div>
+    <div class="c"><div class="ipverify"><div class="line"></div><div class="cnt">1 / 1</div></div>
+      <div class="jp"><span class="k">操作メモ</span>選んだメディア（DVD構成）の中身をIPが読み取り・検証しています。完了すると「構成の準備」画面へ進みます。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();state.ipMediaVerified=true;ipPreparing()">検証完了 → 構成の準備へ</button></div>`);
+}
+function ipPreparing(){
+  render('ip_source');
+  showDlg(`<div class="h">Preparing a recommended RAID configuration…</div>
+    <div class="c"><div class="ipverify"><div class="line"></div></div>
+      <div class="jp"><span class="k">操作メモ</span>IPが推奨RAID構成を用意しようとしています（実機ではスピナー＋［Cancel］が数十秒表示）。本機は <b>MR408i-o（MegaRAID系）＝SmartアレイSRではない</b>ため、この直後に「Smartアレイ無し」画面が出ます（＝正常）。そのまま待ちます。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();go('ip_prep')">準備完了 → 構成の準備へ</button></div>`);
+}
+function ipPrepContinue(){ state.ipPrepDone=true; go('ip_review'); }
+function ipPrepExit(){
+  showDlg(`<div class="h">終了</div>
+    <div class="c"><div class="msg">構成の準備をキャンセルして Intelligent Provisioning のホームに戻ります。</div>
+      <div class="jp"><span class="k">操作メモ</span>本手順では <b>「続行」</b> が正解です（この「Smartアレイ無し」表示はMR環境の正常動作）。戻ってもRAIDは手順Aで作成済み。もう一度 Rapid Setup からやり直せます。</div></div>
+    <div class="btns"><button onclick="hideDlg()">やめる（続行に戻る）</button>
+      <button class="pri" onclick="hideDlg();ipReset();go('ip_home')">ホームに戻る</button></div>`);
+}
+function ipToggleOsDd(){ state.ipOsDd=!state.ipOsDd; render('ip_os'); }
+function ipPickSource(v){ state.ipSource=v; render('ip_source'); }
+function ipMaintNote(){
+  showDlg(`<div class="h">メンテナンスの実行（Perform Maintenance）</div>
+    <div class="c"><div class="msg">Intelligent Provisioning環境設定 / ファームウェアアップデート / Active Health System ダウンロード / 展開設定 / BIOS構成 / iLO構成 / ハードウェア検証 …などの保守メニュー。</div>
+      <div class="jp"><span class="k">操作メモ</span>ファーム更新・iLO・RAIDは手順A〜C/E（F9・F11側）で実施済み。ここで使うのは <b>「Intelligent Provisioning環境設定」＝IP自体の言語(日本語)・タイムゾーン等の設定</b>。<b>Rapid Setup に入る前に開いて日本語にしておく</b>のがおすすめ。</div></div>
+    <div class="btns"><button onclick="hideDlg()">閉じる</button>
+      <button class="pri" onclick="hideDlg();go('ip_pref')">Intelligent Provisioning環境設定 を開く</button></div>`);
+}
+function ipPrefTab(t){ state.ipPrefTab=t; render('ip_pref'); }
+function ipPrefPickLang(v){ state.ipPrefLang=v; render('ip_pref'); }
+function ipPrefSubmit(){ state.ipPrefDone=true; state.ipLang=state.ipPrefLang; go('ip_home'); }
+function ipPrefMain(){
+  const ja = state.ipPrefLang==='日本語';
+  const tab = state.ipPrefTab;
+  const lang = ja?'日本語':'English (US)';
+  return `
+    <div class="iptabs" style="text-align:center;margin:4px 0 14px;">
+      <span class="iptab ${tab==='basic'?'on':''}" style="cursor:pointer;font-weight:700;padding:0 14px;${tab==='basic'?'color:#2f7d68;border-bottom:2px solid #00a982':'color:#8a929c'}" onclick="ipPrefTab('basic')">基本設定（Basic Setting）</span>
+      <span class="iptab ${tab==='network'?'on':''}" style="cursor:pointer;font-weight:700;padding:0 14px;${tab==='network'?'color:#2f7d68;border-bottom:2px solid #00a982':'color:#8a929c'}" onclick="ipPrefTab('network')">ネットワーク設定（Network Setting）</span>
+    </div>
+    ${tab==='basic' ? `
+    <div class="ipform" style="grid-template-columns:1fr 1fr;">
+      <div class="ipfield">
+        <div class="lab">インターフェイス言語（Interface Language）</div>
+        <div class="ipdd" onclick="ipPrefPickLang('${ja?'English (US)':'日本語'}')">${lang} ▾</div>
+      </div>
+      <div class="ipfield"><div class="lab">タイムゾーン（Time Zone）</div><div class="ipdd">${M.tz}</div></div>
+      <div class="ipfield">
+        <div class="lab">キーボード言語（Keyboard Language）</div>
+        <div class="ipdd" onclick="ipPrefPickLang('${ja?'English (US)':'日本語'}')">${lang} ▾</div>
+      </div>
+      <div class="ipfield"><div class="lab">システム日付（System Date）</div><div class="ipdd">（現在値）</div></div>
+      <div class="ipfield"><div class="lab">ブートBIOSモード（Boot Bios Mode）</div><div class="ipdd" style="opacity:.7">UEFI 最適化（固定）</div></div>
+      <div class="ipfield"><div class="lab">システム時刻（System Time）</div><div class="ipdd">（現在値）</div></div>
+      <div class="ipfield">
+        <div class="lab">システムソフトウェアアップデート（System Software Update）</div>
+        <div class="ipdd" style="border-color:#e0a23a">HPE Webサイトからアップデート ▾</div>
+      </div>
+      <div class="ipfield tog"><span class="iptog"><span class="sw"></span></span> EULAに同意（Accept EULA）</div>
+      <div class="ipfield"></div>
+      <div class="ipfield tog"><span class="iptog"><span class="sw off"></span></span> フィードバック有効（Enable Feedback）</div>
+    </div>` : `
+    <div class="ipform" style="grid-template-columns:1fr 1fr;">
+      <div class="ipfield" style="grid-column:1;">
+        <div class="lab">更新・インストールに使うネットワークインターフェイスを選択</div>
+        <div class="ipdd">eth0 BCM5720 … ▾</div>
+      </div>
+      <div class="ipfield" style="grid-column:2;grid-row:1;">
+        <div class="lab">&nbsp;</div>
+        <div class="tog"><span class="iptog"><span class="sw"></span></span> DHCP 自動構成（DHCP Auto-Configuration）</div>
+      </div>
+      <div class="ipfield tog" style="grid-column:1;"><span class="iptog"><span class="sw off"></span></span> プロキシを使用（Use Proxy）</div>
+      <div class="ipfield" style="grid-column:2;"><div class="lab">静的 IPv4 / マスク / ゲートウェイ / DNS</div><div class="ipdd" style="opacity:.5">（DHCP有効時はグレーアウト）</div></div>
+    </div>`}
+    <div style="text-align:center;margin:14px 0;"><button class="ipbtn railb" onclick="ipPrefSubmit()">送信（Submit）</button></div>
+    <div class="anno"><span class="k">操作メモ・重要</span>この画面は <b>ホーム→「メンテナンスの実行」→「Intelligent Provisioning環境設定」</b> で開く、<b>IP自体の言語・地域設定</b>（一次：IPユーザーガイド「Intelligent Provisioning環境設定の設定」）。IPが初回実行時は自動表示される画面と同じ。<br>
+      ${tab==='basic'
+        ? '<b>インターフェイス言語／キーボード言語＝日本語</b> にして「送信」→ 以降のIP画面（Rapid Setup等）が日本語で進む＝作業ミス減。タイムゾーンは <b>'+M.tz+'</b>。<b>Rapid Setupに入る前にやっておく</b>のがおすすめ。'
+        : 'このタブは <b>IP環境自身がファーム更新DL等に使う通信</b>の設定（本番NIC・iLOとは別）。'}
+      <br><span style="font-size:11px">⚠ <b>これはIPのUI言語</b>で、<b>インストールされるWindows自体の言語ではない</b>（OS言語は Rapid Setup の「OS設定＞OS言語」で別途 日本語 を指定）。⚠ <b>「システムソフトウェアアップデート＝HPE Webサイト」やDHCP/プロキシは完全オフラインでは機能しない</b>＝オンライン更新は狙わない（ファームは手順E・F11で更新済み）。${state.ipPrefLang!=='日本語'?'<b style="color:#c9761f"> まず言語を日本語に。</b>':'<b style="color:#2f7d68"> ✓ 日本語に設定済み。</b>'}</span>
+      <div class="gbtn" onclick="ipPrefSubmit()"><span class="k">送信</span>日本語で確定してホームへ ➜</div></div>`;
+}
+function ipSetPart(){
+  const el=document.getElementById('partmb');
+  const v=(el&&el.value.trim())||'';
+  if(!v){ el.style.borderColor='#b23b2e'; el.placeholder='数値を入力（例 '+M.partMB+'）'; return; }
+  state.ipPartSet=true; render('ip_part');
+}
+function ipAllow(){
+  if(!state.ipPartSet){
+    showDlg(`<div class="h">Note</div>
+      <div class="c"><div class="msg">先に「OSボリュームのパーティション」でサイズを指定してください。</div>
+        <div class="jp"><span class="k">操作メモ</span>パーティションで <b>${M.partMB} MB</b> を入力→アップデート。未指定だとCに全容量が割り当てられます。</div></div>
+      <div class="btns"><button class="pri" onclick="hideDlg();go('ip_part')">パーティションへ</button></div>`);
+    return;
+  }
+  showDlg(`<div class="h">構成の許可</div>
+    <div class="c"><div class="msg">この構成でインストールを開始しますか？対象ドライブは新規インストール状態にリセットされます。</div>
+      <div class="jp"><span class="k">操作メモ</span><b>新品サーバーの初回セットアップ</b>のため消えるデータはありません（問題なし）。インストールは約20〜40分、途中で自動再起動が数回入ります（放置でOK）。</div></div>
+    <div class="btns"><button onclick="hideDlg()">キャンセル</button>
+      <button class="pri" onclick="hideDlg();ipStartInstall()">構成の許可</button></div>`);
+}
+function ipStartInstall(){ state.ipAllowed=true; go('ip_install'); }
+function ipDone(){
+  showDlg(`<div class="h">再起動</div>
+    <div class="c"><div class="msg">展開を完了するためにシステムを再起動しています。しばらくお待ちください。</div>
+      <div class="jp"><span class="k">操作メモ</span>この後 Windows のセットアップ（OOBE）に進みます。手順D（Intelligent Provisioning／第4章）はここまで。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();ipReset();hist=[];render('post')">OK（再起動）</button></div>`);
+}
+
+/* ============================================================
+   手順E: ファーム更新（One-Time Boot Menu → SUM）
+   ============================================================ */
+function bootmenuMain(){
+  const nic=(p,m)=>`<div class="row menu"><span class="lbl">Embedded LOM 1 Port ${p} : BCM 5720 - NIC (${m})</span></div>`;
+  return `
+    <div class="row menu"><span class="lbl">Generic USB Boot</span></div>
+    ${nic(1,'PXE IPv4')}${nic(2,'PXE IPv4')}
+    <div class="row menu"><span class="lbl">OCP Slot 14 : HPE MR408i-o Gen11${state.raidCreated?' - Logical Drive 239':'（論理ドライブ未作成）'}</span></div>
+    <div class="row menu rail" onclick="pickUsb()"><span class="lbl">${M.usbLabel}</span><span class="arrow">➜</span></div>
+    <div class="row menu"><span class="lbl">Run a UEFI application from a file system</span></div>
+    <div class="row menu"><span class="lbl">Boot from a URL</span></div>
+    <div class="anno"><span class="k">操作メモ</span>手順E＝ファーム更新。<b>SPH同梱「USB Key Utility」で作った起動USB</b>（例 <b>${M.usbLabel}</b>）を選択 → SUM専用環境（SLESベース）が起動。<br>
+      ⚠ 事前に <b>Secure Boot を Disabled</b> にしておく（オフラインSUMはSecure Boot無効が前提）。<a onclick="jump('rbsu_secureboot')">→ Secure Boot設定（手順B）へ</a><br>
+      <span style="font-size:11px">※ブート項目の並び・NIC名は実機/構成で異なる（本機は新品・OS/RAID未構成なので Windows Boot Manager や論理ドライブは通常出ない）。</span></div>`;
+}
+function fwModeMain(){
+  return `
+    <div class="mi sel" onclick="fwPickMode('Automatic')">Automatic Firmware Update Version 7.45
+      &nbsp;<span style="color:#00795a;font-weight:700;font-size:12px">◀ 次はここ（本ガイド推奨）</span></div>
+    <div class="mi" onclick="fwPickMode('Interactive')">Interactive Firmware Update Version 7.45</div>
+    <div class="anno" style="margin:34px 8px 0"><span class="k">操作メモ</span>起動直後のモード選択（<b>実写：SPH 7.45 起動USB, 2026-09-14</b>）。<b>本ガイドは Automatic（自動）で進めます</b>。
+      <b>Automatic</b>＝1回分を無人で適用し必要に応じ自動再起動。<b>Interactive</b>＝SUMのGUIで確認しながら手動選択。<br>
+      <span style="font-size:11px">※Version は SPH（Service Pack for HPE）媒体の版で、上の <b>7.45</b> は今回の実写媒体の値。媒体を更新すると変わる（実機の媒体版に合わせる）。<br>
+      ※Auto推奨の理由：手動選択（Interactive）だと選び漏れ等で版が意図せず巻き戻る（ダウングレード）恐れがあるため、原則Autoで一括。<br>
+      ※ただしAutoでも「1回で終わらない／SPH収録より実機が新しいNIC・FCカードは自動選択されない」ため、最終的に<b>推奨コンポーネント数が0</b>になるまで再実行、必要時のみInteractiveで手動補完（本編第3章）。<br>
+      ※どちらを選んでも、この後<b>数分は黒画面のLinux起動（Loading kernel → initrd）→ HPEロゴ＋緑バー</b>が続く（＝正常。次画面で再現）。</span></div>`;
+}
+function fwBootMain(){
+  const nextId = 'sum_home';
+  const nextLbl = 'SUM（Smart Update Manager）ホームへ';
+  return `
+    <div class="anno" style="text-align:left;margin:6px 14px 14px"><span class="k">操作メモ</span>
+      いま再生したのが<b>モード選択直後の実際の起動シーケンス</b>（実写2026-09-14を再現）：<b>黒コンソールに「Loading kernel…」→数秒おきに「initial ramdisk…」→全画面黒「Starting initrd…」→フェードインでHPEロゴ→緑の進捗バー</b>。<b>いずれも正常</b>で、黒画面が続いても手を止めて電源を切らないこと（実機は各段が数十秒〜数分）。右上「🔁 最初から／⏭ スキップ」で再生し直せます。<br>
+      <span style="font-size:11px">⚠ 実写は<b>この緑バーの画面まで</b>（＝進捗バーで待機中に撮影終了）。<b>この先のSUM本体GUI（Inventory / Review / Deployment）は未取得</b>のため、次画面以降は本編第3章に基づく<b>擬似（想像図）</b>です。実機で撮れ次第差し替え。</span>
+      <div class="gbtn" onclick="go('${nextId}')"><span class="k">次へ</span>${nextLbl} ➜</div></div>`;
+}
+function fwAutoMain(){
+  const done=state.fwDeployed;
+  const st=done?'<span class="badge b-ok">Success</span>':'<span class="badge b-hs">Deploying…</span>';
+  const line=(c)=>`<div style="display:flex;padding:5px 2px;border-bottom:1px solid #e6e9ec;font-size:12.5px"><span style="flex:1">${c}</span>${st}</div>`;
+  return `
+    <div style="margin:0 0 12px;border:2px dashed #d08a2e;background:#fbf1e2;border-radius:6px;padding:8px 12px;color:#8a5a12;font-size:12px;font-weight:700;">
+      🖉 予想画面（擬似）：この Automatic モードの画面は<b>実機動画に素材が無い</b>ため、本編第3章の記述をもとに構成した想像図です。実機で要確認・是正候補。</div>
+    <div class="sec" style="font-size:15px">Automatic Firmware Update — 自動展開中…</div>
+    <div class="ipprog" style="max-width:460px;margin:10px 0 14px;height:10px"><i style="width:${done?'100':'65'}%"></i></div>
+    <div style="max-width:520px">
+      ${line('System ROM (BIOS)')}${line('iLO 6 Firmware')}${line('HPE MR408i-o Gen11 Controller Firmware')}${line('Embedded BCM5720 NIC Firmware')}
+    </div>
+    <div class="anno" style="text-align:left;margin-top:14px"><span class="k">操作メモ</span>自動モードは<b>無人で展開</b>が進み、終わると必要に応じSUMが自動再起動します（本ガイドはこのAutoで進める）。<br>
+      ⚠ 「放置で全完了」ではありません。再起動後もう一度 <b>F11→USB</b> でSUMを回し、<b>推奨コンポーネント数が0</b>になるまで繰り返します。SPH収録より実機が新しいNIC/FCカードは自動で拾わないので、その分だけ<b>Interactiveで手動補完</b>。完了後 <b>Secure BootをEnabledに復元</b>（手順B）。
+      ${done?'<div class="gbtn" onclick="fwFinish()"><span class="k">完了</span>展開完了 → 再起動</div>':'<div class="gbtn" onclick="fwDeploy()"><span class="k">実行</span>自動展開を進める（デモ）➜</div>'}</div>`;
+}
+function sumHomeMain(){
+  return `
+    <div class="welc">Smart Update Managerへようこそ</div>
+    <div class="cards">
+      <div class="ct">オプションの選択</div>
+      <div class="crow">
+        <div class="card click" onclick="sumOpenMode()">
+          <div class="cic" style="font-size:13px;font-weight:800;line-height:1.05">1·2·3<br>⬇</div>
+          <div class="cnm">ローカルホストガイドアップデート</div>
+          <div class="cds">3つのステップで展開を簡略化。</div>
+        </div>
+        <div class="card">
+          <div class="cic">🗄</div>
+          <div class="cnm">ベースラインライブラリ</div>
+          <div class="cds">アップデートの展開に使用されるソフトウェアおよびファームウェアをインポートします。</div>
+        </div>
+        <div class="card">
+          <div class="cic">🖧</div>
+          <div class="cnm">ノード</div>
+          <div class="cds">ノードへのアップデートの管理、解析および展開。</div>
+        </div>
+      </div>
+    </div>
+    <div class="anno"><span class="k">操作メモ</span>SLES起動後、SUMは<b>この「ようこそ」ホーム</b>で開きます（実写2026-09-14）。本ガイドは左の<b>「ローカルホストガイドアップデート」</b>（3ステップ＝インベントリ→レビュー→展開）をクリック。<br>
+      <span style="font-size:11px">※中央「ベースラインライブラリ」＝媒体（SPH）の取り込み管理、右「ノード」＝対象ノード管理。本案件では使わない。</span></div>`;
+}
+function sumOpenMode(){
+  showDlg(`<div class="h">ローカルホストガイドアップデート</div>
+    <div class="c summode">
+      <div class="note">展開モードを選択してください<br><b>自動モード</b>は、SUMを実行しているシステム上でユーザーとの対話なしに、インベントリを実行し、すべての適用可能なアップデートを展開します。</div>
+      <h4>モード</h4>
+      <div class="moderow">
+        <label><input type="radio" name="summode" checked onclick="state.fwMode='Interactive'"> 対話式</label>
+        <label><input type="radio" name="summode" onclick="state.fwMode='Automatic'"> 自動</label>
+      </div>
+      <h4>前提条件のインストールオプション</h4>
+      <label class="chk"><input type="checkbox" checked> 前提条件コンポーネントがまだインストールされていない場合はインストールします</label>
+      <div class="warny">警告: インベントリプロセス中に、すべてのデバイスのFWバージョンを正しくリストするために、いくつかの前提条件のコンポーネントをインストールする必要があります。前提条件のコンポーネント（ネットワークインターフェイスオプションドライバーなど）をインストールすると、プロセス中にネットワークまたはシステムがリセットされ、システムが停止する場合があります。</div>
+      <h4>ベースラインの選択</h4>
+      <div class="base">（オプション）このノードに適用する追加済みのベースラインおよび/または追加パッケージを選択してください。SUMが実行中のロケーションがデフォルトとして使用されます。<br>現在選択されているベースライン：<b>—</b>／現在の追加パッケージ：—</div>
+      <label class="chk" style="margin-top:8px"><input type="checkbox"> 異なるベースラインの割り当て</label>
+      <div class="jp"><span class="k">操作メモ</span>SUMの既定は<b>対話式</b>（実写どおり）。GUIで各手順を確認しながら進める。無人で一括なら<b>自動</b>（GRUBで「Automatic」起動を選ぶ経路と同じ趣旨）。前提条件チェックは基本ON。<b>OK</b>でインベントリ（手順1）へ。</div>
+    </div>
+    <div class="btns"><button onclick="hideDlg()">キャンセル</button><button class="pri" onclick="hideDlg();go('sum1')">OK</button></div>`);
+}
+function sum1Main(){
+  return `
+    <div class="sec" style="font-size:15px;margin-top:2px">ベースラインおよびノードのインベントリ</div>
+    <div class="acc">ベースラインのインベントリ</div>
+    <div class="invrow" id="sumBase"><span class="sq"></span><span class="msg">アイテムが見つかりませんでした!</span></div>
+    <div class="acc">ローカルホストのインベントリ</div>
+    <div class="invrow" id="sumLocal"><span class="sq"></span><span class="nm">localhost</span><span class="msg">追加されたノード</span></div>
+    <div class="btns2">
+      <button class="sumbtn" id="sumNext" disabled onclick="go('sum2')">次へ</button>
+      <button class="sumbtn" onclick="go('sum_home')">中止</button>
+      <button class="sumbtn" onclick="render('sum1')">最初からやり直す</button>
+      <button class="sumbtn" onclick="fwFinish()">再起動</button>
+    </div>
+    <div class="anno"><span class="k">操作メモ</span>手順1 インベントリ（実写2026-09-14を再現）。まず<b>ベースライン（${M.baseline}）が追加</b>され「コンポーネント合計 ${M.compCount}」表示 → 次に<b>localhost をインベントリ</b>。完了すると「次へ」が押せます（自動再生中…）。<br>
+      <span style="font-size:11px">⚠ 実機なら各コンポーネントの現版数が出るが、今回の実写は<b>VM＝実HPEハード無し</b>のため最終的に「No applicable component found（該当コンポーネント無し）」。実機では該当あり。<b>手順2・3の実画面は未取得＝以降は擬似</b>。</span></div>`;
+}
+function sumInvStart(){
+  fwClearTimers();
+  const base=fwEl('sumBase'), loc=fwEl('sumLocal'), next=fwEl('sumNext');
+  if(!base) return;
+  base.innerHTML='<span class="sq"></span><span class="msg">アイテムが見つかりませんでした!</span>';
+  loc.innerHTML='<span class="sq"></span><span class="nm">localhost</span><span class="msg">追加されたノード</span>';
+  if(next) next.disabled=true;
+  fwT(1000, ()=>{ base.innerHTML=`<span class="sq"></span><span class="nm">${M.baseline}</span><span class="msg">ベースラインが正常に追加されました</span><span class="sbar"><i style="width:100%"></i></span><span class="cnt">コンポーネント合計 ${M.compCount}</span>`; });
+  fwT(2700, ()=>{ loc.innerHTML='<span class="sq run"></span><span class="nm">localhost</span><span class="msg">インベントリの進行中</span><span class="sbar"><i style="width:55%"></i></span><span class="cnt">インベントリを開始しました。</span>'; });
+  fwT(5000, ()=>{ loc.innerHTML='<span class="sq"></span><span class="nm">localhost</span><span class="msg">インベントリ完了</span><span class="sbar"><i style="width:100%"></i></span><span class="cnt">No applicable component found.</span>'; if(next) next.disabled=false; });
+}
+function sum2Main(){
+  const row=(c)=>`<tr style="background:#e4f6ef"><td>☑</td><td>${c}</td><td style="text-align:center;color:#127a56">✔</td></tr>`;
+  return `
+    <div style="margin:2px 0 12px;border:2px dashed #d08a2e;background:#fbf1e2;border-radius:6px;padding:8px 12px;color:#8a5a12;font-size:12px;font-weight:700;">
+      🖉 擬似（実機例）：今回の実写は<b>手順1（インベントリ）まで</b>。手順2レビューの実画面は未取得のため、本編第3章＋本機構成で構成した想像図です。実機で撮れ次第差し替え。</div>
+    <div class="sec">推奨アップデート（Recommended updates）</div>
+    <table class="t">
+      <tr><th></th><th>コンポーネント</th><th>準備完了 (Ready)</th></tr>
+      ${row('System ROM (BIOS) — U63')}${row('iLO 6 Firmware')}${row('HPE MR408i-o Gen11 Controller Firmware')}${row('Embedded BCM5720 NIC Firmware')}
+    </table>
+    <div class="btns2"><button class="sumbtn" onclick="go('sum3')">次へ（展開）</button><button class="sumbtn" onclick="go('sum1')">戻る</button></div>
+    <div class="anno"><span class="k">操作メモ</span>手順2 レビュー。<b>薄緑ハイライト＝推奨</b>。準備完了(Ready)に赤があれば依存関係を確認。確認したら<b>展開（手順3）</b>へ。<br>
+      <span style="font-size:11px">※版数（現在→SPH版）は実機/SPHで異なるため省略。対象は本機構成の例。VMでは「該当無し」で空になる。</span></div>`;
+}
+function sum3Main(){
+  const done=state.fwDeployed;
+  const st=done?'<span class="badge b-ok">Success</span>':'<span class="badge b-hs">Deploying…</span>';
+  const row=(c)=>`<tr><td>${c}</td><td>SPH</td><td>${st}</td><td>View</td></tr>`;
+  return `
+    <div style="margin:2px 0 12px;border:2px dashed #d08a2e;background:#fbf1e2;border-radius:6px;padding:8px 12px;color:#8a5a12;font-size:12px;font-weight:700;">
+      🖉 擬似（実機例）：手順3展開の実画面も未取得。実機で撮れ次第差し替え。</div>
+    <div class="sec">展開（Deployment）</div>
+    <div class="ipprog" style="margin:6px 0 12px;height:10px"><i style="width:${done?'100':'70'}%"></i></div>
+    <div class="acc">展開の結果</div>
+    <table class="t">
+      <tr><th>コンポーネント</th><th>パッケージ</th><th>展開ステータス</th><th>ログ</th></tr>
+      ${row('System ROM (BIOS)')}${row('iLO 6 Firmware')}${row('MR408i-o Gen11 Firmware')}${row('BCM5720 NIC Firmware')}
+    </table>
+    <div class="btns2">
+      ${done?'<button class="sumbtn" onclick="fwFinish()">終了（Exit）→ 再起動</button>':'<button class="sumbtn" onclick="fwDeploy()">展開を実行</button>'}
+      <button class="sumbtn" onclick="go('sum2')">戻る</button>
+    </div>
+    <div class="anno"><span class="k">操作メモ</span>手順3 展開。「展開（Deploy）」で適用 → 各コンポーネントが<b>Success</b>になるまで待つ。<br>
+      <span style="font-size:11px">⚠ 依存関係で1回で終わらないことあり。再起動後もう一度 F11→USB でSUMを回し<b>推奨コンポーネント数0</b>まで繰返し。完了後<b>Secure BootをEnabledに復元</b>（手順B／第2章）。</span></div>`;
+}
+/* ---- 手順E 操作 ---- */
+function pickUsb(){ go('fw_mode'); }
+function fwPickMode(m){ state.fwMode=m; go('fw_boot'); }
+function fwDeploy(){ state.fwDeployed=true; render(current); }
+function fwExit(){ fwFinish(); }
+function fwFinish(){
+  showDlg(`<div class="h">再起動</div>
+    <div class="c"><div class="msg">Firmware update complete. Exiting SUM and rebooting the system.</div>
+      <div class="jp"><span class="k">操作メモ</span>ファーム更新完了。SUMを終了して再起動します。<br>
+        ※依存関係で残りがあれば、再起動後もう一度 <b>F11→USB</b> でSUMを回し「推奨コンポーネント数＝0」を確認。完了後 <b>Secure BootをEnabledに復元</b>（手順B）。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();state.fwMode=null;state.fwDeployed=false;hist=[];render('post')">OK（再起動）</button></div>`);
+}
+function renderFwMode(s){
+  return `<section class="screen"><div class="fwmode">
+    <div class="top"><span class="logo"></span><span class="he">Hewlett Packard<br>Enterprise</span></div>
+    <div class="fwframe"><div class="mbody">${s.main}</div></div>
+    <div class="fwfoot">Copyright © 2024 Hewlett Packard Enterprise Development LP</div>
+  </div></section>`;
+}
+function renderFwBoot(s){
+  return `<section class="screen"><div class="fwboot" id="fwboot">
+    <div class="fwctl">
+      <button onclick="fwBootStart()">🔁 最初から</button>
+      <button onclick="fwSkip()">⏭ スキップ</button>
+    </div>
+    <!-- ①枠付き黒コンソール（実写02/03）：kernel→ramdisk が1行ずつ増える -->
+    <div class="layer lyr-framed" id="lyrFramed">
+      <div class="top"><span class="logo"></span><span class="he">Hewlett Packard<br>Enterprise</span></div>
+      <div class="fwmid"><div class="console fwmono" id="fwLog"></div></div>
+      <div class="fwfoot">Copyright © 2024 Hewlett Packard Enterprise Development LP</div>
+    </div>
+    <!-- ②全画面黒（実写04）：Starting initrd... -->
+    <div class="layer lyr-black fwmono" id="lyrBlack" style="display:none"></div>
+    <!-- ③HPE白スプラッシュ（実写05/06）：黒からフェードイン→緑バー -->
+    <div class="layer lyr-splash" id="lyrSplash" style="display:none">
+      <div class="sp">
+        <div class="hpe"></div>
+        <div class="wd"><b>Hewlett Packard</b><span>Enterprise</span></div>
+      </div>
+      <div class="bar"><i id="fwBar"></i></div>
+    </div>
+    <div class="fwstat" id="fwStat"></div>
+  </div></section>
+  <div id="fwNote" style="display:none">${s.main}</div>`;
+}
+/* 実写の時間進行を自動再生（メニュー選択直後に起動）。renderがfw_boot描画後にfwBootStart()を呼ぶ */
+let fwTimers=[];
+function fwClearTimers(){ fwTimers.forEach(clearTimeout); fwTimers=[]; }
+function fwT(ms,fn){ fwTimers.push(setTimeout(fn,ms)); }
+function fwEl(id){ return document.getElementById(id); }
+function fwPutLog(el, lines, cursor){
+  if(!el) return;
+  el.innerHTML = lines.join('\n') + (cursor ? (lines.length?'\n':'') + '<span class="cur"></span>' : '');
+}
+function fwPhase(p){
+  const f=fwEl('lyrFramed'), b=fwEl('lyrBlack'), s=fwEl('lyrSplash');
+  if(!f) return;
+  if(p==='framed'){ f.style.display='flex'; b.style.display='none'; s.style.display='none'; s.classList.remove('show'); }
+  else if(p==='black'){ f.style.display='none'; b.style.display='flex'; s.style.display='none'; s.classList.remove('show'); }
+  else if(p==='splash'){ b.style.display='flex'; s.style.display='flex';   // 黒を下に残してフェードイン
+    requestAnimationFrame(()=>requestAnimationFrame(()=>s.classList.add('show'))); }
+}
+function fwStat(t){ const e=fwEl('fwStat'); if(e) e.textContent=t; }
+function fwBootStart(){
+  fwClearTimers();
+  const framedLog=fwEl('fwLog'), blackLog=fwEl('lyrBlack'), bar=fwEl('fwBar'), note=fwEl('fwNote');
+  if(!framedLog) return;               // 別画面に居る場合は何もしない
+  if(note) note.style.display='none';
+  if(bar){ bar.style.transition=''; bar.style.width='6%'; }
+  fwPhase('framed'); fwPutLog(framedLog, [], true);
+  fwStat('SLES（SUM専用環境）を起動中… ※実写の時間進行を再現（実機はもっと長い）');
+  const L=[];
+  fwT(700,  ()=>{ L.push('Loading kernel...');          fwPutLog(framedLog, L.slice(), true); });
+  fwT(2600, ()=>{ L.push('Loading initial ramdisk...');  fwPutLog(framedLog, L.slice(), true); });
+  fwT(4800, ()=>{ fwPhase('black'); fwPutLog(blackLog, ['Starting initrd...'], true);
+                  fwStat('initrd 起動中…（この黒画面がしばらく続く＝正常）'); });
+  fwT(7400, ()=>{ fwPhase('splash'); fwStat('HPE スプラッシュ（黒からフェードイン）'); });
+  fwT(9100, ()=>{ if(bar) bar.style.width='93%'; fwStat('SUM 環境を準備中…（実写はこの緑バーで停止）'); });
+  fwT(11000,()=>{ if(note) note.style.display='block'; fwStat('実写取得はここまで ▶ この先の SUM GUI は擬似'); });
+}
+function fwSkip(){
+  fwClearTimers();
+  const bar=fwEl('fwBar'), note=fwEl('fwNote'), s=fwEl('lyrSplash');
+  fwPhase('splash'); if(s) s.classList.add('show');
+  if(bar){ bar.style.transition='none'; bar.style.width='93%'; }
+  if(note) note.style.display='block';
+  fwStat('（スキップ）実写取得はここまで ▶ この先の SUM GUI は擬似');
+}
+function renderSum(s){
+  const steps=[['手順 1','インベントリ'],['手順 2','レビュー'],['手順 3','展開']];
+  const stepper = s.step ? `<div class="steps">${steps.map((t,i)=>`<div class="st${(i+1)===s.step?' on':''}">${t[0]}<small>${t[1]}</small></div>`).join('')}</div>` : '';
+  const act = s.step ? '<span class="act">アクション ▾</span>' : '';
+  return `<section class="screen"><div class="sum">
+    <div class="hd"><span class="logo"></span><span class="ver">${M.sumVer} <b>▾</b></span><span class="ic">🔔 👤 ?</span></div>
+    <div class="sub">${s.sumTitle||''}${act}</div>
+    ${stepper}
+    <div class="body">${s.main}</div>
+    <div class="sumfoot">© Copyright 2026 Hewlett Packard Enterprise Development LP</div>
+  </div></section>`;
+}
+
+/* ============================================================
+   遷移エンジン（履歴スタック＝ESC/パンくずで戻る＝出典どおり）
+   ============================================================ */
+let hist = [];
+let current = 'post';
+
+function buildMain(id){
+  if(id==='sysconfig')       SCREENS.sysconfig.main       = sysconfigMain();
+  if(id==='props')           SCREENS.props.main           = propsMain();
+  if(id==='mainmenu')        SCREENS.mainmenu.main        = mainmenuMain();
+  if(id==='create')          SCREENS.create.main          = createMain();
+  if(id==='ldmgmt')          SCREENS.ldmgmt.main          = ldmgmtMain();
+  if(id==='drivemgmt')       SCREENS.drivemgmt.main       = drivemgmtMain();
+  if(id==='rbsu_avail')      SCREENS.rbsu_avail.main      = availMain();
+  if(id==='rbsu_secureboot') SCREENS.rbsu_secureboot.main = secureBootMain();
+  if(id==='ilo_net')         SCREENS.ilo_net.main         = iloNetMain();
+  if(id==='ip_boot')         SCREENS.ip_boot.main         = ipBootMain();
+  if(id==='ip_splash')       SCREENS.ip_splash.main       = ipSplashMain();
+  if(id==='ip_home')         SCREENS.ip_home.main         = ipHomeMain();
+  if(id==='ip_pref')         SCREENS.ip_pref.main         = ipPrefMain();
+  if(id==='ip_source')       SCREENS.ip_source.main       = ipSourceMain();
+  if(id==='ip_prep')         SCREENS.ip_prep.main         = ipPrepMain();
+  if(id==='ip_review')       SCREENS.ip_review.main       = ipReviewMain();
+  if(id==='ip_os')           SCREENS.ip_os.main           = ipOsMain();
+  if(id==='ip_part')         SCREENS.ip_part.main         = ipPartMain();
+  if(id==='ip_install')      SCREENS.ip_install.main      = ipInstallMain();
+  if(id==='bootmenu')        SCREENS.bootmenu.main        = bootmenuMain();
+  if(id==='fw_mode')         SCREENS.fw_mode.main         = fwModeMain();
+  if(id==='fw_boot')         SCREENS.fw_boot.main         = fwBootMain();
+  if(id==='fw_auto')         SCREENS.fw_auto.main         = fwAutoMain();
+  if(id==='sum_home')        SCREENS.sum_home.main        = sumHomeMain();
+  if(id==='sum1')            SCREENS.sum1.main            = sum1Main();
+  if(id==='sum2')            SCREENS.sum2.main            = sum2Main();
+  if(id==='sum3')            SCREENS.sum3.main            = sum3Main();
+}
+function render(id){
+  if(typeof fwClearTimers==='function') fwClearTimers();   // 起動アニメのタイマーを止める（画面離脱時）
+  buildMain(id);
+  const s = SCREENS[id];
+  const stage = document.getElementById('stage');
+  stage.innerHTML = (s.type==='post') ? renderPost()
+    : (s.type==='ipboot') ? renderIpBoot(s)
+    : (s.type==='ipsplash') ? renderIpSplash(s)
+    : (s.type==='ip') ? renderIp(s)
+    : (s.type==='fwmode') ? renderFwMode(s)
+    : (s.type==='fwboot') ? renderFwBoot(s)
+    : (s.type==='sum') ? renderSum(s)
+    : renderHii(s);
+  window.scrollTo(0,0);
+  current = id;
+  if(id==='fw_boot') fwBootStart();                        // 実写の起動シーケンスを自動再生
+  if(id==='sum1') sumInvStart();                           // 手順1インベントリの進行を自動再生
+}
+function go(id){ hist.push(current); render(id); }        // 進む
+function back(){ if(hist.length) render(hist.pop()); }     // 戻る（ESC/パンくず）
+function jump(id){ hist.push(current); render(id); }       // 目次ジャンプ
+
+// キー操作（UEFIガイド準拠）：ESC=戻る / F9=System Utilities(POST時) / F7=既定値 / F10=保存 / F12=保存して終了
+document.addEventListener('keydown', e=>{
+  const k = e.key;
+  if(k==='Escape'){ back(); return; }
+  if(k==='F9'){ if(current==='post'){ e.preventDefault(); go('sysutil'); } return; }
+  if(k==='F7'){ e.preventDefault(); keyF7(); return; }
+  if(k==='F10'){ e.preventDefault(); if(current==='post'){ go('ip_boot'); } else { keyF10(); } return; }
+  if(k==='F11'){ if(current==='post'){ e.preventDefault(); go('bootmenu'); } return; }
+  if(k==='F12'){ e.preventDefault(); keyF12(); return; }
+});
+
+/* ---- F7 / F10 / F12（保存・終了）の推移 ---- */
+// POST画面ではキーガイドが別（F9/F10=IP等）なので無効
+function inUtil(){ return current!=='post'; }
+
+// F7: Load Defaults（既定値の読み込み）
+function keyF7(){
+  if(!inUtil()) return;
+  showDlg(`<div class="h">Load Default Options</div>
+    <div class="c"><div class="msg">Load the default configuration options?<br><span class="warn">Current changes will be lost.</span></div>
+      <div class="jp"><span class="k">操作メモ</span>既定値を読み込みます。現在の変更内容は失われます。</div></div>
+    <div class="btns">
+      <button onclick="hideDlg()">No</button>
+      <button class="pri" onclick="hideDlg();defaultsLoaded()">Yes</button>
+    </div>`);
+}
+function defaultsLoaded(){
+  state.rebootRequired = true;
+  showDlg(`<div class="h">Load Default Options</div>
+    <div class="c"><div class="msg">Default options have been loaded.</div>
+      <div class="jp"><span class="k">操作メモ</span>既定値を読み込みました。反映には保存（F10）と再起動が必要です。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();render(current)">OK</button></div>`);
+}
+
+// F10: Save（変更を保存。ユーティリティには留まる）
+function keyF10(){
+  if(!inUtil()) return;
+  showDlg(`<div class="h">Save Changes</div>
+    <div class="c"><div class="msg">Save the pending configuration changes?</div>
+      <div class="jp"><span class="k">操作メモ</span>保存後もユーティリティに留まります（終了しません）。反映には再起動が必要です。</div></div>
+    <div class="btns">
+      <button onclick="hideDlg()">No</button>
+      <button class="pri" onclick="hideDlg();savedStay()">Yes</button>
+    </div>`);
+}
+function savedStay(){
+  state.rebootRequired = true;
+  showDlg(`<div class="h">Save Changes</div>
+    <div class="c"><div class="msg">Changes saved successfully.</div>
+      <div class="jp"><span class="k">操作メモ</span>変更を保存しました。反映するには再起動してください（F12＝保存して終了・再起動）。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();render(current)">OK</button></div>`);
+}
+
+// F12: Save and Exit（保存して終了→再起動）
+function keyF12(){
+  if(!inUtil()) return;
+  showDlg(`<div class="h">Save and Exit</div>
+    <div class="c"><div class="msg">Save changes, exit the utility, and reboot the system?</div>
+      <div class="jp"><span class="k">操作メモ</span>変更を保存してユーティリティを終了し、再起動します。</div></div>
+    <div class="btns">
+      <button onclick="hideDlg()">No</button>
+      <button onclick="hideDlg();exitNoSave()">Don't Save</button>
+      <button class="pri" onclick="hideDlg();savedExit()">Yes</button>
+    </div>`);
+}
+function savedExit(){
+  showDlg(`<div class="h">Save and Exit</div>
+    <div class="c"><div class="msg">Changes saved. The system is rebooting...</div>
+      <div class="jp"><span class="k">操作メモ</span>変更を保存しました。再起動します。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();rebootNow()">OK</button></div>`);
+}
+function exitNoSave(){
+  showDlg(`<div class="h">Exit</div>
+    <div class="c"><div class="msg">Exit without saving and reboot?<br><span class="warn">Unsaved changes will be discarded.</span></div>
+      <div class="jp"><span class="k">操作メモ</span>変更を保存せずに終了し、再起動します。未保存の変更は破棄されます。</div></div>
+    <div class="btns">
+      <button onclick="hideDlg()">Cancel</button>
+      <button class="pri" onclick="hideDlg();rebootNow()">OK</button>
+    </div>`);
+}
+function rebootNow(){
+  state.rebootRequired = false;
+  hist = [];
+  render('post');
+}
+
+/* ---- ダイアログ ---- */
+function showDlg(html){ document.getElementById('dlg').innerHTML=html;
+  document.getElementById('overlay').classList.add('on'); }
+function hideDlg(){ document.getElementById('overlay').classList.remove('on'); }
+
+// Select Drives の Apply（簡易：戻ると選択済みフラグ）
+// createへ戻る導線は go('create') で処理。ここでフラグを立てる。
+const _go = go;
+go = function(id){
+  if(current==='drives' && id==='create'){ state.drivesPicked = true; }
+  _go(id);
+};
+
+// Select Drives の Apply Changes → Success（実機：適用後に成功メッセージ）→ フォームへ戻る
+function applyDrives(){
+  showDlg(`<div class="h">Success</div>
+    <div class="c"><div class="msg">The operation has been performed successfully.</div>
+      <div class="jp"><span class="k">操作メモ</span>選択したドライブを適用しました。フォームに戻り、<b>一番下までスクロールして「Save Configuration」</b>で保存します。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();go('create')">OK</button></div>`);
+}
+
+// Save Configuration → Warning → Success → Logical Drive Management
+function saveConfig(){
+  if(!state.drivesPicked){
+    showDlg(`<div class="h">Note</div>
+      <div class="c"><div class="msg">Select at least one drive before saving the configuration.</div>
+        <div class="jp"><span class="k">操作メモ</span>先に <b>Select Drives</b> でドライブ（RAID1＝Bay1+Bay2）を選択してください。</div></div>
+      <div class="btns"><button class="pri" onclick="hideDlg()">OK</button></div>`);
+    return;
+  }
+  showDlg(`<div class="h">Warning</div>
+    <div class="c"><div class="msg"><span class="warn">Creating Logical Drives will cause the data on the associated Drives to be permanently deleted. Are you sure you want to continue with this operation?</span>
+        <div class="chk"><input type="checkbox" id="cfm"> Confirm</div></div>
+      <div class="jp"><span class="k">操作メモ</span>対象ドライブ上のデータは完全に消去されます。実機同様「Confirm」にチェック →「Yes」。</div></div>
+    <div class="btns">
+      <button onclick="hideDlg()">No</button>
+      <button class="pri" onclick="confirmSave()">Yes</button>
+    </div>`);
+}
+function confirmSave(){
+  if(!document.getElementById('cfm').checked){
+    // 実機同様、Confirmチェックが必要
+    document.getElementById('cfm').parentElement.style.color='#b23b2e';
+    return;
+  }
+  hideDlg();
+  const p = pass();
+  if(p===1) state.raidCreated = true; else state.raid0Created = true;
+  state.drivesPicked = false; // 次パスに向けてリセット
+  const msg = p===1 ? 'RAID1 論理ドライブ（Logical Drive 0・OS用）' : 'RAID0 論理ドライブ（Logical Drive 1・DATA用）';
+  // 実機は成功メッセージが2段（①作成成功→②操作成功）
+  showDlg(`<div class="h">Create Logical Drive</div>
+    <div class="c"><div class="msg">Logical Drive creation was successful. All free configurable space has been used.</div>
+      <div class="jp"><span class="k">操作メモ</span>${msg}を作成しました。続けて確認メッセージが出ます（OK）。</div></div>
+    <div class="btns"><button class="pri" onclick="saveSuccess2()">OK</button></div>`);
+}
+function saveSuccess2(){
+  showDlg(`<div class="h">Success</div>
+    <div class="c"><div class="msg">The operation has been performed successfully.</div>
+      <div class="jp"><span class="k">操作メモ</span>作成が反映されました。Logical Drive Management で確認します。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();jump('ldmgmt')">OK</button></div>`);
+}
+
+/* ---- BIOS 操作 ---- */
+function setWol(v){ state.wol=v; render('rbsu_avail'); }
+function setAutoPower(v){ state.autoPower=v; render('rbsu_avail'); }
+function setSecureBoot(v){ state.secureBoot=v; render('rbsu_secureboot'); }
+function biosSave(){
+  showDlg(`<div class="h">Save Changes</div>
+    <div class="c"><div class="msg">Save the pending configuration changes and reboot the system?</div>
+      <div class="jp"><span class="k">操作メモ</span>
+        Wake-On LAN：<b>${state.wol}</b>／Automatic Power-On：<b>${state.autoPower}</b>／Secure Boot：<b>${state.secureBoot}</b>。
+        保存後、設定反映のため再起動します。</div></div>
+    <div class="btns">
+      <button onclick="hideDlg()">No</button>
+      <button class="pri" onclick="hideDlg();biosSaved()">Yes</button>
+    </div>`);
+}
+function biosSaved(){
+  showDlg(`<div class="h">Success</div>
+    <div class="c"><div class="msg">Changes saved successfully. The system is rebooting...</div>
+      <div class="jp"><span class="k">操作メモ</span>BIOS設定を保存しました。再起動します。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();jump('post')">OK（再起動）</button></div>`);
+}
+
+// ホットスペア Go → Warning → Success
+function assignSpare(){
+  const op = document.getElementById('op').value;
+  showDlg(`<div class="h">Warning</div>
+    <div class="c"><div class="msg">Perform <b>${op}</b> on the selected drive (Bay 4)?
+        <div class="chk"><input type="checkbox" id="cfm2"> Confirm</div></div>
+      <div class="jp"><span class="k">操作メモ</span>Bay 4（SLOT3）をグローバルホットスペアに指定します。「Confirm」→「Yes」。</div></div>
+    <div class="btns">
+      <button onclick="hideDlg()">No</button>
+      <button class="pri" onclick="confirmSpare()">Yes</button>
+    </div>`);
+}
+function confirmSpare(){
+  if(!document.getElementById('cfm2').checked){
+    document.getElementById('cfm2').parentElement.style.color='#b23b2e'; return;
+  }
+  hideDlg();
+  state.spareAssigned = true;
+  showDlg(`<div class="h">Success</div>
+    <div class="c"><div class="msg">The operation has been performed successfully.</div>
+      <div class="jp"><span class="k">操作メモ</span>Bay 4（SLOT3）をグローバルホットスペアに指定しました。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();jump('drivemgmt')">OK</button></div>`);
+}
+
+// 終了/再起動プロンプト
+function rebootPrompt(){
+  const jp = state.raidCreated ? 'RAID設定は完了しています。' : '⚠ まだ RAID を作成していません。';
+  showDlg(`<div class="h">System Utilities</div>
+    <div class="c"><div class="msg">Exit the utility and reboot the system?</div>
+      <div class="jp"><span class="k">操作メモ</span>${jp} F10で保存 → 再起動でRAID構成が確定します。</div></div>
+    <div class="btns">
+      <button onclick="hideDlg()">Cancel</button>
+      <button class="pri" onclick="hideDlg();rebootNow()">Reboot</button>
+    </div>`);
+}
+
+/* ============================================================
+   ★ サンドボックス（自由試行モード）= データ駆動 State マシン
+   既存のオンレール手順A〜E（検証済み）には一切触れず、別モードとして併設。
+   シェル(renderHii)/CSS 資産は流用。ここは「擬似・自由試行」＝実素材1:1縛りは外す。
+   ------------------------------------------------------------
+   単一 State オブジェクト sb に、物理ドライブ/アレイ/論理ドライブ/BIOS設定/
+   ブート順を集約。全画面は sb からの純レンダリング（State-driven View）。
+   ============================================================ */
+
+// --- RAIDレベル定義（ドメインロジック） ---
+const RAID = {
+  'RAID0':  { min:1,        cap:(n,S)=>n*S,       label:'RAID 0（ストライピング・冗長なし）' },
+  'RAID1':  { min:2, max:2, cap:(n,S)=>S,         label:'RAID 1（ミラーリング・2本）' },
+  'RAID5':  { min:3,        cap:(n,S)=>(n-1)*S,   label:'RAID 5（分散パリティ・最少3本）' },
+  'RAID6':  { min:4,        cap:(n,S)=>(n-2)*S,   label:'RAID 6（二重パリティ・最少4本）' },
+  'RAID10': { min:4, even:true, cap:(n,S)=>(n/2)*S, label:'RAID 10（ミラー＋ストライプ・偶数4本〜）' }
+};
+const CAP_OPTS = [480,960,1000,1200,1920,2000,4000,8000]; // GB（10進表記の公称容量）
+const DISK_KIND = [
+  {type:'HDD', iface:'SATA'},{type:'HDD', iface:'SAS'},
+  {type:'SSD', iface:'SATA'},{type:'SSD', iface:'SAS'},{type:'SSD', iface:'NVMe'}
+];
+const MAX_BAYS = 10;
+
+// GB(10進) → 使用可能 TiB/GiB（実機は2TB HDD=1.819TB/1863.016GiB 表記）
+function toGiB(capGB){ return capGB*1e9/(1024**3); }
+function fmtCap(capGB){
+  const tib = capGB*1e9/(1024**4);
+  return `${tib.toFixed(3)} TB（${toGiB(capGB).toFixed(2)} GiB）`;
+}
+function fmtCapShort(capGB){ return `${(capGB/1000).toFixed(capGB%1000?2:0)} TB`; }
+
+// --- 物理ドライブのプリセット ---
+function mkDisk(i, type, iface, capGB){
+  return { id:'d'+i, port:'1I', box:1, bay:i+1, type, iface, capGB, status:'UG', arrayId:null };
+}
+const PRESETS = {
+  'honki':   { label:'本案件：2TB SATA HDD ×4', build:()=>Array.from({length:4},(_,i)=>mkDisk(i,'HDD','SATA',2000)) },
+  'ssd6':    { label:'960GB SATA SSD ×6',        build:()=>Array.from({length:6},(_,i)=>mkDisk(i,'SSD','SATA',960)) },
+  'nvme8':   { label:'1.92TB NVMe SSD ×8',       build:()=>Array.from({length:8},(_,i)=>mkDisk(i,'SSD','NVMe',1920)) },
+  'mix2':    { label:'最小：2TB HDD ×2',          build:()=>Array.from({length:2},(_,i)=>mkDisk(i,'HDD','SATA',2000)) }
+};
+
+function SBDEF(){
+  return {
+    disks: PRESETS.honki.build(),
+    arrays: [],            // {id, level, diskIds:[], capGB}
+    lds: [],               // {id, arrayId, level, name, sizeGB, drives:[bay...]}
+    nextArrayId: 0, nextLdId: 0,
+    // Create Logical Drive フォーム作業状態
+    cf: { level:'RAID1', picked:[], name:'', size:null, unit:'GiB' },
+    dmSel:null,            // Drive Management で選択中のドライブ
+
+    // BIOS 設定（実データ）
+    bios: {
+      wol:'Enabled', autoPowerOn:'Restore Last Power State', powerOnDelay:'No Delay', f1Prompt:'Delayed 20 Seconds',
+      powerProfile:'Balanced Power and Performance', minProcIdle:'C6 Retention', turbo:'Enabled', workloadProfile:'General Power Efficient Compute',
+      secureBoot:'Enabled', tpm:'Enabled', powerOnPw:false, adminPw:false,
+      bootMode:'UEFI Mode',
+      bootOrder:['Windows Boot Manager','USB DISK 3.0','Embedded LOM 1 Port 1 : IPv4 Network Boot','Internal SD Card']
+    },
+    reboot:false
+  };
+}
+let sb = SBDEF();
+
+/* ---- ドメインロジック：容量計算・検証・作成・削除 ---- */
+function ugDisks(){ return sb.disks.filter(d=>d.status==='UG'); }
+function diskById(id){ return sb.disks.find(d=>d.id===id); }
+function arrayCapGB(level, ids){
+  const def = RAID[level]; if(!def) return 0;
+  const sizes = ids.map(id=>diskById(id).capGB);
+  const S = Math.min(...sizes);      // 混在時は最小メンバに合わせる
+  return def.cap(ids.length, S);
+}
+// 選択本数×レベルの妥当性チェック（実機同様のエラー文言を返す）
+function validateArray(level, ids){
+  const def = RAID[level];
+  const n = ids.length;
+  if(n===0) return { ok:false, msg:'論理ドライブを作成する前に、ドライブを1本以上選択してください。', en:'Select at least one drive before creating the logical drive.' };
+  if(n < def.min) return { ok:false,
+    msg:`選択本数（${n}本）は ${level} には不足しています。${level} は最少 ${def.min} 本必要です。`,
+    en:`The number of drives selected (${n}) is not valid for ${level}. This RAID level requires a minimum of ${def.min} drives.` };
+  if(def.max && n > def.max) return { ok:false,
+    msg:`${level} はちょうど ${def.max} 本で構成します（選択：${n}本）。`,
+    en:`${level} requires exactly ${def.max} drives. ${n} drives were selected.` };
+  if(def.even && n%2!==0) return { ok:false,
+    msg:`${level} は偶数本で構成します（最少 ${def.min} 本／選択：${n}本）。`,
+    en:`${level} requires an even number of drives (minimum ${def.min}). ${n} drives were selected.` };
+  const sizes = ids.map(id=>diskById(id).capGB);
+  const mixed = new Set(sizes).size > 1;
+  return { ok:true, mixed, minGB:Math.min(...sizes) };
+}
+function createArrayFromForm(){
+  const { level, picked } = sb.cf;
+  const v = validateArray(level, picked);
+  if(!v.ok){ sbErr(v); return; }
+  const aid = sb.nextArrayId++;
+  const capGB = arrayCapGB(level, picked);
+  sb.arrays.push({ id:aid, level, diskIds:[...picked], capGB });
+  picked.forEach(id=>{ const d=diskById(id); d.status='Online'; d.arrayId=aid; });
+  const lid = sb.nextLdId++;
+  const drives = picked.map(id=>{ const d=diskById(id); return `Bay ${d.bay}`; });
+  sb.lds.push({ id:lid, arrayId:aid, level, name:(sb.cf.name||''), sizeGB:capGB, drives });
+  sb.cf = { level:'RAID1', picked:[], name:'', size:null, unit:'GiB' };
+  sb.reboot = true;
+  const mixWarn = v.mixed ? `<br><span style="color:#b5710f">※メンバの容量が混在していたため、最小メンバ（${fmtCapShort(v.minGB)}）に合わせて構成しました。</span>` : '';
+  showDlg(`<div class="h">Create Logical Drive</div>
+    <div class="c"><div class="msg">Logical Drive ${lid} (${level}) was created successfully. Capacity: ${fmtCap(capGB)}.</div>
+      <div class="jp"><span class="k">結果</span>${level} の論理ドライブ（Logical Drive ${lid}）を作成しました。容量 <b>${fmtCap(capGB)}</b>。${mixWarn}</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();jump('ldmgmt')">OK</button></div>`);
+}
+function deleteLd(lid){
+  const ld = sb.lds.find(l=>l.id===lid); if(!ld) return;
+  const arr = sb.arrays.find(a=>a.id===ld.arrayId);
+  if(arr){ arr.diskIds.forEach(id=>{ const d=diskById(id); d.status='UG'; d.arrayId=null; }); }
+  sb.arrays = sb.arrays.filter(a=>a.id!==ld.arrayId);
+  sb.lds = sb.lds.filter(l=>l.id!==lid);
+  sb.reboot=true;
+  render('ldmgmt');
+}
+function sbErr(v){
+  showDlg(`<div class="h">Error</div>
+    <div class="c"><div class="msg warn">${v.en}</div>
+      <div class="jp"><span class="k">検証</span>${v.msg}</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg()">OK</button></div>`);
+}
+
+/* ---- Create フォーム操作 ---- */
+function sbSetLevel(v){ sb.cf.level=v; render('create'); }
+function sbTogglePick(id){
+  const i = sb.cf.picked.indexOf(id);
+  if(i<0) sb.cf.picked.push(id); else sb.cf.picked.splice(i,1);
+  render('drives');
+}
+function sbPickAll(v){ sb.cf.picked = v ? ugDisks().map(d=>d.id) : []; render('drives'); }
+function sbApplyDrives(){
+  const v = validateArray(sb.cf.level, sb.cf.picked);
+  if(!v.ok){ sbErr(v); return; }
+  showDlg(`<div class="h">Success</div>
+    <div class="c"><div class="msg">The operation has been performed successfully. ${sb.cf.picked.length} drive(s) selected.</div>
+      <div class="jp"><span class="k">結果</span>${sb.cf.picked.length}本を選択しました。フォームに戻り「Save Configuration」で作成します。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();go('create')">OK</button></div>`);
+}
+
+/* ---- Drive Management：ドライブ単体操作（実機同様に per-drive 画面へ） ---- */
+function sbOpenDrive(id){ sb.dmSel=id; go('sb_drive'); }
+function sbDriveGo(){
+  const op = document.getElementById('op').value;
+  const d = diskById(sb.dmSel); if(!d) return;
+  if(op==='Assign Global Spare Drive'){
+    if(d.status!=='UG'){ sbErr({en:'Only an Unconfigured Good drive can be assigned as a hot spare.', msg:'ホットスペアに指定できるのは Unconfigured Good のドライブだけです。'}); return; }
+    d.status='HotSpare';
+  } else if(op==='Unassign Global Spare Drive'){
+    if(d.status==='HotSpare') d.status='UG';
+  } else if(op==='Make JBOD'){
+    if(d.status==='Online'){ sbErr({en:'Cannot convert a drive that is part of a logical drive. Delete the logical drive first.', msg:'論理ドライブに参加中のドライブは変換できません。先に論理ドライブを削除してください。'}); return; }
+    d.status='JBOD';
+  } else if(op==='Make Unconfigured Good'){
+    if(d.status==='Online'){ sbErr({en:'Cannot convert a drive that is part of a logical drive. Delete the logical drive first.', msg:'論理ドライブに参加中のドライブは変換できません。先に論理ドライブを削除してください。'}); return; }
+    d.status='UG';
+  }
+  sb.reboot=true;
+  showDlg(`<div class="h">Success</div>
+    <div class="c"><div class="msg">The operation has been performed successfully.</div>
+      <div class="jp"><span class="k">結果</span>Bay ${d.bay} に「${op}」を実行しました。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();jump('drivemgmt')">OK</button></div>`);
+}
+
+/* ---- ドライブ構成エディタ（サンドボックス専用・構造変更はアレイ消去の確認を挟む） ---- */
+function sbHasConfig(){ return sb.arrays.length>0; }
+let _pendingStructural=null;
+function sbGuardStructural(fn){
+  if(sbHasConfig()){
+    _pendingStructural=fn;
+    showDlg(`<div class="h">Warning</div>
+      <div class="c"><div class="msg warn">Changing the physical drive configuration will clear all arrays and logical drives. Continue?</div>
+        <div class="jp"><span class="k">確認</span>物理ドライブ構成を変えると、作成済みのアレイ／論理ドライブは全て消去されます。続けますか？</div></div>
+      <div class="btns"><button onclick="hideDlg();_pendingStructural=null">No</button>
+        <button class="pri" onclick="sbStructuralYes()">Yes</button></div>`);
+  } else { fn(); }
+}
+function sbStructuralYes(){ hideDlg(); sbClearAll(); const f=_pendingStructural; _pendingStructural=null; if(f) f(); }
+function sbClearAll(){ sb.arrays=[]; sb.lds=[]; sb.nextArrayId=0; sb.nextLdId=0;
+  sb.disks.forEach(d=>{ if(d.status==='Online'){ d.status='UG'; d.arrayId=null; } }); }
+function _renumberBays(){ sb.disks.forEach((d,i)=>{ d.id='d'+i; d.bay=i+1; }); }
+function sbAddDisk(){
+  if(sb.disks.length>=MAX_BAYS){ sbErr({en:`This backplane supports a maximum of ${MAX_BAYS} drives.`, msg:`このサンドボックスは最大 ${MAX_BAYS} 本までです。`}); return; }
+  sbGuardStructural(function(){
+    const i=sb.disks.length; sb.disks.push(mkDisk(i,'HDD','SATA',2000)); render('sb_diskcfg');
+  });
+}
+function sbDelDisk(id){
+  if(sb.disks.length<=1){ sbErr({en:'At least one drive is required.', msg:'最低1本は必要です。'}); return; }
+  sbGuardStructural(function(){
+    sb.disks = sb.disks.filter(d=>d.id!==id); _renumberBays(); render('sb_diskcfg');
+  });
+}
+function sbSetKind(id,val){
+  sbGuardStructural(function(){
+    const [type,iface]=val.split('|'); const d=diskById(id); d.type=type; d.iface=iface; render('sb_diskcfg');
+  });
+}
+function sbSetCap(id,val){
+  sbGuardStructural(function(){ diskById(id).capGB=+val; render('sb_diskcfg'); });
+}
+function sbPreset(key){
+  if(!key) return;
+  sbGuardStructural(function(){ sb.disks = PRESETS[key].build(); render('sb_diskcfg'); });
+}
+
+/* ---- BIOS 操作（実データ書き込み） ---- */
+function sbBios(k,v){ sb.bios[k]=v; sb.reboot=true; render(current); }
+function sbBootMove(i,dir){
+  const o=sb.bios.bootOrder, j=i+dir;
+  if(j<0||j>=o.length) return;
+  [o[i],o[j]]=[o[j],o[i]]; sb.reboot=true; render('sb_boot');
+}
+function sbTogglePw(k){ sb.bios[k]=!sb.bios[k]; sb.reboot=true; render('rbsu_security'); }
+function sbClearConfigPrompt(){
+  if(!sb.lds.length){ sbErr({en:'There is no configuration to clear.', msg:'消去する構成（論理ドライブ）がありません。'}); return; }
+  showDlg(`<div class="h">Warning</div>
+    <div class="c"><div class="msg warn">This will delete ALL logical drives and clear the configuration. Are you sure?
+        <div class="chk"><input type="checkbox" id="cfgc"> Confirm</div></div>
+      <div class="jp"><span class="k">操作メモ</span>全ての論理ドライブを削除して構成を消去します。メンバは Unconfigured Good に戻ります。</div></div>
+    <div class="btns"><button onclick="hideDlg()">No</button>
+      <button class="pri" onclick="sbClearConfigDo()">Yes</button></div>`);
+}
+function sbClearConfigDo(){
+  if(!document.getElementById('cfgc').checked){ document.getElementById('cfgc').parentElement.style.color='#b23b2e'; return; }
+  hideDlg(); sbClearAll(); sb.reboot=true;
+  showDlg(`<div class="h">Success</div>
+    <div class="c"><div class="msg">The operation has been performed successfully.</div>
+      <div class="jp"><span class="k">結果</span>構成を消去しました。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg();jump('configmgmt')">OK</button></div>`);
+}
+
+/* ============================================================
+   サンドボックス 画面ビルダー（renderHii シェルを流用）
+   ============================================================ */
+function sbBanner(txt){
+  // オンレールのガイドと同じ .anno（青紫）に統一。サンドボックス識別は上部バー＋cap の SANDBOX チップが担う。
+  return `<div class="anno"><span class="k">メモ</span>${txt}</div>`;
+}
+/* ---- 実機に存在するが本サンドボックス未対応の項目＝「残すがリンクしない」 ---- */
+function inertRow(label){
+  return `<div class="row menu inert" onclick="sbInert(this)"><span class="lbl">${label}</span><span class="arrow">➜</span></div>`;
+}
+function sbInert(el){
+  const label = el.querySelector('.lbl').textContent;
+  showDlg(`<div class="h">${label}</div>
+    <div class="c"><div class="msg">This menu item exists on the actual firmware, but is not implemented in this sandbox.</div>
+      <div class="jp"><span class="k">メモ</span>この項目は実機ファームウェアには存在します。本サンドボックス（自由試行）では未実装のため開けません＝実機の項目を勝手に削らず、リンクしないだけにしています。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg()">OK</button></div>`);
+}
+function badgeOf(d){
+  return d.status==='UG' ? '<span class="badge b-ok">Unconfigured Good</span>'
+    : d.status==='Online' ? `<span class="badge b-ok">Online (Array ${d.arrayId})</span>`
+    : d.status==='HotSpare' ? '<span class="badge b-hs">Global Hot Spare</span>'
+    : d.status==='JBOD' ? '<span class="badge b-jbod">JBOD</span>'
+    : '<span class="badge b-fail">Failed</span>';
+}
+function selOf(cur){ return v=>cur===v?' selected':''; }
+
+/* ===== メニュー画面：実機 System Utilities ツリーを忠実にミラー（項目を削らない） ===== */
+// System Utilities（実機と同一項目）
+function sbSysutilMain(){
+  return `
+    <div class="row menu" data-k onclick="go('sysconfig')"><span class="lbl">System Configuration</span><span class="arrow">➜</span></div>
+    ${inertRow('One-Time Boot Menu')}
+    ${inertRow('Embedded Applications')}
+    <div class="row menu" data-k onclick="go('sysinfo')"><span class="lbl">System Information</span><span class="arrow">➜</span></div>
+    ${inertRow('System Health')}
+    <div class="row menu" data-k style="margin-top:14px" onclick="rebootPrompt()"><span class="lbl">Exit and resume system boot</span></div>
+    <div class="row menu" data-k onclick="rebootPrompt()"><span class="lbl">Reboot the System</span></div>
+    ${sbBanner('自由試行モード。実機の System Utilities と同じ項目構成です。灰色の項目は実機に存在しますが本サンドボックス未対応（クリックで説明）。ドライブ本数・容量の編集は上部バーの「🧪 ドライブ構成」から。')}`;
+}
+// System Configuration（実機と同一項目・手順ヒントは載せない）
+function sbSysconfigMain(){
+  return `
+    <div class="row menu" data-k onclick="go('rbsu')"><span class="lbl">BIOS/Platform Configuration (RBSU)</span><span class="arrow">➜</span></div>
+    <div class="row menu" data-k onclick="go('ilo')"><span class="lbl">iLO 6 Configuration Utility</span><span class="arrow">➜</span></div>
+    <div class="row menu" data-k onclick="go('props')"><span class="lbl">${M.slot}: ${M.ctrl}</span><span class="arrow">➜</span></div>
+    ${inertRow('Embedded LOM 1 Port 1 : BCM 5720 - NIC')}
+    ${inertRow('Embedded LOM 1 Port 2 : BCM 5720 - NIC')}`;
+}
+// MR コントローラ PROPERTIES（数値は sb 由来）→ Main Menu
+function sbPropsMain(){
+  const n=sb.disks.length, arrays=sb.arrays.length, lds=sb.lds.length, jbods=sb.disks.filter(d=>d.status==='JBOD').length;
+  return `
+    <div class="row menu inert" onclick="sbInert(this)"><span class="lbl">Help</span></div>
+    <div class="grp">PROPERTIES:</div>
+    <div class="row dim"><span class="lbl">Status</span><span class="ctl dim"><input value="Optimal" readonly></span></div>
+    <div class="row dim"><span class="lbl">Backplane</span><span class="ctl dim"><input value="1" readonly></span></div>
+    <div class="row dim"><span class="lbl">Enclosure</span><span class="ctl dim"><input value="1" readonly></span></div>
+    <div class="row dim"><span class="lbl">Drives</span><span class="ctl dim"><input value="${n}" readonly></span></div>
+    <div class="row dim"><span class="lbl">JBODs</span><span class="ctl dim"><input value="${jbods}" readonly></span></div>
+    <div class="row dim"><span class="lbl">Arrays</span><span class="ctl dim"><input value="${arrays}" readonly></span></div>
+    <div class="row dim"><span class="lbl">Logical Drives</span><span class="ctl dim"><input value="${lds}" readonly></span></div>
+    <div class="row dim"><span class="lbl">ROC Temperature (C)</span><span class="ctl dim"><input value="55" readonly></span></div>
+    <div class="row menu" data-k onclick="go('mainmenu')" style="margin-top:10px"><span class="lbl">Main Menu</span><span class="arrow">➜</span></div>`;
+}
+// Main Menu（実機と同一5項目・未実装はinert）
+function sbMainmenuMain(){
+  return `
+    <div class="row menu" data-k onclick="go('configmgmt')"><span class="lbl">Configuration Management</span><span class="arrow">➜</span></div>
+    <div class="row menu" data-k onclick="go('sb_ctrlmgmt')"><span class="lbl">Controller Management</span><span class="arrow">➜</span></div>
+    <div class="row menu" data-k onclick="go('ldmgmt')"><span class="lbl">Logical Drive Management</span><span class="arrow">➜</span></div>
+    <div class="row menu" data-k onclick="go('drivemgmt')"><span class="lbl">Drive Management</span><span class="arrow">➜</span></div>
+    ${inertRow('Hardware Components')}`;
+}
+// Controller Management（MR Gen11 Controller UG「コントローラーの管理」より・データ駆動）
+function sbCtrlmgmtMain(){
+  const kv=(k,v)=>`<div class="row dim"><span class="lbl">${k}</span><span class="ctl dim"><input value="${v}" readonly></span></div>`;
+  return `<div class="grp">PROPERTIES:</div>
+    ${kv('Product Name', M.ctrl)}
+    ${kv('Serial Number', 'SK'+M.sn.slice(0,8))}
+    ${kv('Controller Status', 'Optimal')}
+    ${kv('Select Boot Device', sb.lds.length?('Logical Drive 0'):'None')}
+    ${kv('PCI ID', '0x1000 / 0x10E2')}
+    ${kv('PCI Slot Number', '14')}
+    ${kv('Active Package Version', '52.26.3-5250')}
+    ${kv('Backup Version', '—')}
+    ${kv('PSOC Firmware Version', '—')}
+    ${kv('Connector', '2')}
+    ${kv('Drive Count', sb.disks.length)}
+    ${kv('Logical Drive Count', sb.lds.length)}
+    <div class="row menu" data-k onclick="go('sb_advctrl')" style="margin-top:8px"><span class="lbl">Advanced Controller Management</span><span class="arrow">➜</span></div>
+    ${inertRow('Advanced Controller Properties')}
+    ${sbBanner('MR Gen11 Controller UG「コントローラーの管理」準拠。一部の版数/PCI値は代表値（実機で確定）。')}`;
+}
+// Advanced Controller Management（同UG「アドバンストコントローラー管理」の実項目・未実装はリンクしない）
+function sbAdvctrlMain(){
+  const items=['Clear Controller Events','Save Controller Events','Save Serial Log','Enable Drive Security',
+    'Disable Drive Security','Change Current Security Settings','Change Drive Security Key Management Mode',
+    'Manage Link Speed','Manage MegaRAID Advanced Software Options','Schedule Consistency Check',
+    'Set Factory Defaults','Manage Auto Configuration'];
+  return items.map(it=>inertRow(it)).join('')
+    + sbBanner('実機の「アドバンストコントローラー管理」全項目です。本サンドボックスでは各アクションは未実装のため、項目は残しつつリンクしていません（灰色）。');
+}
+// Configuration Management（実機と同一項目・Clear Configuration は実装）
+function sbConfigmgmtMain(){
+  return `
+    <div class="row menu" data-k onclick="go('create')"><span class="lbl">Create Logical Drive</span><span class="arrow">➜</span></div>
+    ${inertRow('Make Unconfigured Good')}
+    <div class="row menu" data-k onclick="sbClearConfigPrompt()"><span class="lbl">Clear Configuration</span><span class="arrow">➜</span></div>
+    ${sbBanner('RAID作成は <b>Create Logical Drive</b>。作成済みを全消去するなら <b>Clear Configuration</b>。物理ドライブ本数/容量を変えたい時は上部バー「🧪 ドライブ構成」。')}`;
+}
+// Create Logical Drive（データ駆動：レベル選択で容量自動計算）
+function sbCreateMain(){
+  const nUG = ugDisks().length, nPick = sb.cf.picked.length;
+  // 実機同様、空きUGドライブ数で選べるRAIDレベルを絞る（例: 3本なら RAID0/RAID1/RAID5 の3択）
+  const availLevels = Object.keys(RAID).filter(l=>RAID[l].min<=nUG);
+  if(availLevels.length && !availLevels.includes(sb.cf.level)) sb.cf.level = availLevels[availLevels.length-1];
+  const lvlList = availLevels.length ? availLevels : ['RAID0'];
+  const lvlOpt = lvlList.map(l=>`<option value="${l}"${sb.cf.level===l?' selected':''}>${l}</option>`).join('');
+  const v = nPick? validateArray(sb.cf.level, sb.cf.picked) : null;
+  const capGB = (v&&v.ok)? arrayCapGB(sb.cf.level, sb.cf.picked) : null;
+  const pickInfo = nPick
+    ? (v.ok ? `<span style="color:var(--hl);font-size:11px;font-weight:700;margin-left:8px">✓ ${nPick} drive(s) selected</span>`
+            : `<span style="color:#b23b2e;font-size:11px;font-weight:700;margin-left:8px">✕ ${v.msg}</span>`)
+    : `<span style="color:#8a5a12;font-size:11px;font-weight:700;margin-left:8px">→ Select drives first</span>`;
+  const def = RAID[sb.cf.level];
+  return `
+    <div class="row menu" data-k onclick="createArrayFromForm()"><span class="lbl">Save Configuration</span><span class="arrow">➜</span></div>
+    <div class="row sel"><span class="lbl">Select RAID Level</span>
+      <span class="ctl"><select onchange="sbSetLevel(this.value)">${lvlOpt}</select></span></div>
+    <div class="sub">${def.label}</div>
+    <div class="row"><span class="lbl">Unmap Capability</span><span class="ctl"><select><option>Disabled</option><option>Enabled</option></select></span></div>
+    <div class="row menu" data-k onclick="go('drives')"><span class="lbl">Select Drives</span><span class="arrow">➜</span>${pickInfo}</div>
+    <div class="grp">CONFIGURE LOGICAL DRIVE PARAMETERS:</div>
+    <div class="row"><span class="lbl">Logical Drive Name</span><span class="ctl"><input value="${sb.cf.name}" oninput="sb.cf.name=this.value" placeholder="(任意)"></span></div>
+    <div class="row"><span class="lbl">Logical Drive Size</span><span class="ctl"><input value="${capGB!=null?toGiB(capGB).toFixed(3):'(select drives)'}" readonly></span></div>
+    <div class="row"><span class="lbl">Logical Drive Size Unit</span><span class="ctl"><select><option>GiB</option><option>MiB</option><option>TiB</option></select></span></div>
+    <div class="row"><span class="lbl">Strip Size</span><span class="ctl"><select><option>256 KB</option><option>64 KB</option><option>128 KB</option></select></span></div>
+    <div class="row"><span class="lbl">Read Policy</span><span class="ctl"><select><option>No Read Ahead</option><option>Read Ahead</option></select></span></div>
+    <div class="row"><span class="lbl">Write Policy</span><span class="ctl"><select><option>Write Back</option><option>Write Through</option></select></span></div>
+    <div class="row"><span class="lbl">I/O Policy</span><span class="ctl"><select><option>Direct</option><option>Cached</option></select></span></div>
+    <div class="row menu rail" data-k onclick="createArrayFromForm()"><span class="lbl">Save Configuration</span><span class="arrow">➜</span></div>
+    ${sbBanner(`空きUGドライブ：<b>${nUG}本</b>。<b>Select RAID Level</b> は実機同様、装着本数で選べる範囲だけ表示されます（現在の候補：<b>${lvlList.join(' / ')}</b>）。「Select Drives」で本数を選ぶと容量が自動計算。要件：RAID0=1本〜／RAID1=2本／RAID5=3本〜／RAID6=4本〜／RAID10=偶数4本〜。`)}`;
+}
+// Select Drives（データ駆動：UGドライブをチェック選択）
+function sbDrivesMain(){
+  const ug = ugDisks();
+  if(!ug.length) return `<div class="sub">No unconfigured drives are available.</div>`
+    + sbBanner('空きの Unconfigured Good ドライブがありません。論理ドライブを削除するか、上部バー「🧪 ドライブ構成」で追加してください。');
+  const rows = ug.map(d=>{
+    const on = sb.cf.picked.includes(d.id);
+    return `<div class="chk" style="cursor:pointer" onclick="sbTogglePick('${d.id}')">
+      <input type="checkbox" ${on?'checked':''} onclick="event.preventDefault()">
+      Port ${d.port}, Box ${d.box}, Bay ${d.bay}: ${d.iface}, ${d.type}, ${fmtCapShort(d.capGB)}, Unconfigured Good</div>`;
+  }).join('');
+  const v = sb.cf.picked.length? validateArray(sb.cf.level, sb.cf.picked): null;
+  const status = v ? (v.ok
+    ? `<div class="sub" style="color:#0c8a68"><b>✓ ${sb.cf.level}</b>：${sb.cf.picked.length}本 → 容量 ${fmtCap(arrayCapGB(sb.cf.level,sb.cf.picked))}</div>`
+    : `<div class="sub" style="color:#b23b2e"><b>✕</b> ${v.msg}</div>`) : '';
+  return `
+    <div class="row"><span class="lbl">Select Media Type</span><span class="ctl"><select><option>Both</option><option>HDD</option><option>SSD</option></select></span></div>
+    <div class="row"><span class="lbl">Select Interface Type</span><span class="ctl"><select><option>All</option><option>SATA</option><option>SAS</option><option>NVMe</option></select></span></div>
+    <div class="sub" style="margin-top:6px">Target RAID Level: <b>${sb.cf.level}</b> — ${RAID[sb.cf.level].label}</div>
+    <div class="grp">CHOOSE UNCONFIGURED DRIVES:</div>
+    ${rows}
+    <div class="row menu" data-k onclick="sbPickAll(true)"><span class="lbl">Check All</span></div>
+    <div class="row menu" data-k onclick="sbPickAll(false)"><span class="lbl">Uncheck All</span></div>
+    ${status}
+    <div class="row menu rail" data-k onclick="sbApplyDrives()"><span class="lbl">Apply Changes</span><span class="arrow">➜</span></div>`;
+}
+// Logical Drive Management（データ駆動：一覧＋削除）
+function sbLdmMain(){
+  if(!sb.lds.length) return `<div class="sub" style="margin-top:10px">Unable to display logical drive summary as there are no logical drives currently available.</div>`
+    + sbBanner('論理ドライブは未作成です。Configuration Management → Create Logical Drive から作成できます。');
+  const rows = sb.lds.map(l=>`<tr>
+    <td>Logical Drive ${l.id}</td><td>${l.level}</td><td>${fmtCapShort(l.sizeGB)}</td>
+    <td>${l.drives.join(', ')}</td>
+    <td>${l.name?`<span style="color:#5b6bd6">${l.name}</span>`:'<span style="color:#9aa2ab">—</span>'}</td>
+    <td><span class="badge b-ok">Optimal</span></td>
+    <td><span class="rmv" onclick="deleteLd(${l.id})">Delete</span></td></tr>`).join('');
+  return `<table class="t">
+      <tr><th>Logical Drive</th><th>RAID</th><th>Size</th><th>Drives</th><th style="color:#5b6bd6">Name</th><th>Status</th><th></th></tr>
+      ${rows}
+    </table>
+    ${sbBanner('各行の <b>Delete</b> で論理ドライブを削除できます（メンバは Unconfigured Good に戻り、別レベルで作り直せます）。')}`;
+}
+// Drive Management（データ駆動：クリックで per-drive 画面へ＝実機同様）
+function sbDmMain(){
+  const rows = sb.disks.map(d=>`<tr class="pick" onclick="sbOpenDrive('${d.id}')">
+      <td>Port ${d.port}, Box ${d.box}, Bay ${d.bay}</td>
+      <td>${d.iface} ${d.type} ${fmtCapShort(d.capGB)}</td>
+      <td>${badgeOf(d)}</td>
+      <td>▶ Select</td></tr>`).join('');
+  return `<table class="t">
+      <tr><th>Location</th><th>Model</th><th>Status</th><th></th></tr>
+      ${rows}
+    </table>
+    ${sbBanner('ドライブ行をクリック → Operation で単体操作（Assign Global Spare＝UGのみ／JBOD⇄UG 変換等）。Online（アレイ参加中）は変換不可＝先に論理ドライブを削除。')}`;
+}
+// per-drive Operation 画面（実機 spare 画面に相当）
+function sbDriveMain(){
+  const d = diskById(sb.dmSel);
+  if(!d) return `<div class="sub">No drive selected.</div>`;
+  const ops = ['Make Unconfigured Good','Make JBOD','Assign Global Spare Drive','Unassign Global Spare Drive','Make Bootable Drive'];
+  const pre = d.status==='UG' ? 'Assign Global Spare Drive' : d.status==='HotSpare' ? 'Unassign Global Spare Drive' : 'Make Unconfigured Good';
+  const opt = ops.map(o=>`<option${o===pre?' selected':''}>${o}</option>`).join('');
+  return `
+    <div class="sub">${d.iface}, ${d.type}, ${fmtCapShort(d.capGB)}, ${d.status==='UG'?'Unconfigured Good':d.status}</div>
+    <div class="row sel"><span class="lbl">Operation</span>
+      <span class="ctl"><select id="op">${opt}</select></span></div>
+    <div class="row menu rail" data-k onclick="sbDriveGo()"><span class="lbl">Go</span><span class="arrow">➜</span></div>
+    <div class="grp">DRIVE PROPERTIES:</div>
+    <div class="row dim"><span class="lbl">Status</span><span class="ctl dim"><input value="${d.status==='UG'?'Unconfigured Good':d.status}" readonly></span></div>
+    <div class="row dim"><span class="lbl">Size</span><span class="ctl dim"><input value="${fmtCap(d.capGB)}" readonly></span></div>
+    <div class="row dim"><span class="lbl">Model</span><span class="ctl dim"><input value="${d.iface} ${d.type} ${fmtCapShort(d.capGB)}" readonly></span></div>`;
+}
+// 🧪 ドライブ構成エディタ（サンドボックス専用ツール＝実機メニューには足さず、上部バーから到達）
+function sbDiskcfgMain(){
+  const rows = sb.disks.map(d=>{
+    const kindVal = `${d.type}|${d.iface}`;
+    const kindOpt = DISK_KIND.map(k=>`<option value="${k.type}|${k.iface}"${kindVal===`${k.type}|${k.iface}`?' selected':''}>${k.type} / ${k.iface}</option>`).join('');
+    const capOpt = CAP_OPTS.map(c=>`<option value="${c}"${d.capGB===c?' selected':''}>${fmtCapShort(c)}</option>`).join('');
+    return `<tr>
+      <td>Port ${d.port}, Box ${d.box}, Bay ${d.bay}</td>
+      <td><select onchange="sbSetKind('${d.id}',this.value)">${kindOpt}</select></td>
+      <td><select onchange="sbSetCap('${d.id}',this.value)">${capOpt}</select></td>
+      <td>${badgeOf(d)}</td>
+      <td><span class="rmv" onclick="sbDelDisk('${d.id}')">Remove</span></td>
+    </tr>`;
+  }).join('');
+  const presetOpt = Object.entries(PRESETS).map(([k,p])=>`<option value="${k}">${p.label}</option>`).join('');
+  return sbBanner('これは実機ファームウェアには無い、<b>サンドボックス専用の仮想バックプレーン編集ツール</b>です（実機メニューには項目を足していません）。構成を変えると作成済みアレイはリセットされます。')
+    + `<div class="grp">PHYSICAL DRIVE CONFIGURATION:</div>
+    <table class="t">
+      <tr><th>Location</th><th>Type / Interface</th><th>Capacity</th><th>Status</th><th></th></tr>
+      ${rows}
+    </table>
+    <div class="row menu" data-k onclick="sbAddDisk()"><span class="lbl">Add Drive</span><span class="arrow">➜</span></div>
+    <div class="row"><span class="lbl">Load Preset</span><span class="ctl"><select onchange="sbPreset(this.value);this.selectedIndex=0"><option value="">— select —</option>${presetOpt}</select></span></div>
+    <div class="row menu rail" data-k onclick="go('sysconfig')"><span class="lbl">Back to System Configuration</span><span class="arrow">➜</span></div>`;
+}
+
+/* ===== BIOS/Platform Configuration (RBSU)：実機と同一項目 ===== */
+function sbRbsuMain(){
+  return `
+    <div class="row menu" data-k onclick="go('rbsu_sysopt')"><span class="lbl">System Options</span><span class="arrow">➜</span></div>
+    ${inertRow('Processor Options')}
+    ${inertRow('Memory Options')}
+    <div class="row menu" data-k onclick="go('sb_boot')"><span class="lbl">Boot Options</span><span class="arrow">➜</span></div>
+    ${inertRow('Network Options')}
+    <div class="row menu" data-k onclick="go('rbsu_security')"><span class="lbl">Server Security</span><span class="arrow">➜</span></div>
+    <div class="row menu" data-k onclick="go('sb_power')"><span class="lbl">Power and Performance Options</span><span class="arrow">➜</span></div>
+    ${inertRow('Storage Options')}`;
+}
+function sbSysoptMenuMain(){
+  return `
+    ${inertRow('Boot Time Optimizations')}
+    ${inertRow('Serial Port Options')}
+    <div class="row menu" data-k onclick="go('rbsu_avail')"><span class="lbl">Server Availability</span><span class="arrow">➜</span></div>
+    ${inertRow('Server Asset Information')}
+    ${inertRow('USB Options')}`;
+}
+function sbAvailMain(){
+  const s=selOf(sb.bios.wol), a=selOf(sb.bios.autoPowerOn), pd=selOf(sb.bios.powerOnDelay), f1=selOf(sb.bios.f1Prompt);
+  return `<div class="grp">SERVER AVAILABILITY:</div>
+    <div class="row sel"><span class="lbl">Wake-On LAN</span><span class="ctl"><select onchange="sbBios('wol',this.value)">
+      <option${s('Enabled')}>Enabled</option><option${s('Disabled')}>Disabled</option></select></span></div>
+    <div class="row"><span class="lbl">Automatic Power-On</span><span class="ctl"><select onchange="sbBios('autoPowerOn',this.value)">
+      <option${a('Restore Last Power State')}>Restore Last Power State</option>
+      <option${a('Always Power On')}>Always Power On</option>
+      <option${a('Always Power Off')}>Always Power Off</option></select></span></div>
+    <div class="row"><span class="lbl">Power-On Delay</span><span class="ctl"><select onchange="sbBios('powerOnDelay',this.value)">
+      <option${pd('No Delay')}>No Delay</option><option${pd('15 Second Delay')}>15 Second Delay</option>
+      <option${pd('30 Second Delay')}>30 Second Delay</option></select></span></div>
+    <div class="row"><span class="lbl">POST F1 Prompt</span><span class="ctl"><select onchange="sbBios('f1Prompt',this.value)">
+      <option${f1('Delayed 20 Seconds')}>Delayed 20 Seconds</option><option${f1('Enabled')}>Enabled</option><option${f1('Disabled')}>Disabled</option></select></span></div>
+    ${sbBanner(`現在：Wake-On LAN=<b>${sb.bios.wol}</b>／Automatic Power-On=<b>${sb.bios.autoPowerOn}</b>。変更は即 State に反映（下部バー F10 でも確定）。`)}`;
+}
+function sbSecurityMenuMain(){
+  const pwRow = (on,k,label)=>`<div class="row menu" data-k onclick="sbTogglePw('${k}')"><span class="lbl">${label}</span>
+    <span style="font-size:11px;font-weight:700;color:${on?'#0c8a68':'#8a929b'};margin-right:8px">${on?'✓ Set':'Not Set'}</span><span class="arrow">➜</span></div>`;
+  return `
+    ${pwRow(sb.bios.powerOnPw,'powerOnPw','Set Power On Password')}
+    ${pwRow(sb.bios.adminPw,'adminPw','Set Admin Password')}
+    <div class="row menu" data-k onclick="go('rbsu_secureboot')"><span class="lbl">Secure Boot Settings</span><span class="arrow">➜</span></div>
+    ${inertRow('TLS (HTTPS) Options')}
+    ${inertRow('TPM 2.0 Configuration')}
+    ${sbBanner('パスワード項目はクリックで Set/未設定をトグル（擬似）。Secure Boot の有効/無効は <b>Secure Boot Settings</b>。')}`;
+}
+function sbSecureMain(){
+  const sel=selOf(sb.bios.secureBoot);
+  return `
+    <div class="row sel"><span class="lbl">Secure Boot Enforcement</span>
+      <span class="ctl"><select onchange="sbBios('secureBoot',this.value)">
+        <option${sel('Enabled')}>Enabled</option><option${sel('Disabled')}>Disabled</option></select></span></div>
+    ${inertRow('Advanced Secure Boot Options')}
+    ${sbBanner(`Secure Boot=<b>${sb.bios.secureBoot}</b>。この値は POST 画面と左サイドの Secure Boot 表示に連動します（サンドボックスの State は独立）。`)}`;
+}
+function sbPowerMain(){
+  const p=selOf(sb.bios.powerProfile), c=selOf(sb.bios.minProcIdle), t=selOf(sb.bios.turbo), w=selOf(sb.bios.workloadProfile);
+  return `<div class="grp">POWER AND PERFORMANCE:</div>
+    <div class="row sel"><span class="lbl">Workload Profile</span><span class="ctl"><select onchange="sbBios('workloadProfile',this.value)">
+      <option${w('General Power Efficient Compute')}>General Power Efficient Compute</option>
+      <option${w('General Peak Frequency Compute')}>General Peak Frequency Compute</option>
+      <option${w('Virtualization - Max Performance')}>Virtualization - Max Performance</option>
+      <option${w('Low Latency')}>Low Latency</option>
+      <option${w('Custom')}>Custom</option></select></span></div>
+    <div class="row"><span class="lbl">Power Regulator</span><span class="ctl"><select onchange="sbBios('powerProfile',this.value)">
+      <option${p('Balanced Power and Performance')}>Balanced Power and Performance</option>
+      <option${p('Static High Performance')}>Static High Performance</option>
+      <option${p('OS Control Mode')}>OS Control Mode</option>
+      <option${p('Static Low Power')}>Static Low Power</option></select></span></div>
+    <div class="row"><span class="lbl">Minimum Processor Idle Power Core C-State</span><span class="ctl"><select onchange="sbBios('minProcIdle',this.value)">
+      <option${c('C6 Retention')}>C6 Retention State</option><option${c('C1E')}>C1E State</option><option${c('No C-states')}>No C-states</option></select></span></div>
+    <div class="row"><span class="lbl">Intel Turbo Boost Technology</span><span class="ctl"><select onchange="sbBios('turbo',this.value)">
+      <option${t('Enabled')}>Enabled</option><option${t('Disabled')}>Disabled</option></select></span></div>
+    ${sbBanner(`現在の Workload Profile=<b>${sb.bios.workloadProfile}</b>。`)}`;
+}
+function sbBootMain(){
+  const bm=selOf(sb.bios.bootMode);
+  const n=sb.bios.bootOrder.length;
+  const rows = sb.bios.bootOrder.map((b,i)=>`<div class="row">
+    <span class="lbl">${i+1}. ${b}</span>
+    <button class="mvbtn" ${i===0?'disabled':''} onclick="sbBootMove(${i},-1)">▲</button>
+    <button class="mvbtn" ${i===n-1?'disabled':''} onclick="sbBootMove(${i},1)">▼</button></div>`).join('');
+  return `<div class="row sel"><span class="lbl">Boot Mode</span><span class="ctl"><select onchange="sbBios('bootMode',this.value)">
+      <option${bm('UEFI Mode')}>UEFI Mode</option><option${bm('Legacy BIOS Mode')}>Legacy BIOS Mode</option></select></span></div>
+    <div class="grp">UEFI BOOT ORDER:</div>
+    ${rows}
+    ${sbBanner('▲▼ で起動順を並べ替え（State の配列を直接操作）。最上位が最優先の起動デバイス。')}`;
+}
+function sbSysinfoMain(){
+  const n=sb.disks.length, tot=sb.disks.reduce((s,d)=>s+d.capGB,0);
+  const arrays=sb.arrays.length, lds=sb.lds.length;
+  const kinds=[...new Set(sb.disks.map(d=>`${d.iface} ${d.type}`))].join(', ')||'—';
+  const kv=(k,v)=>`<div class="row dim"><span class="lbl">${k}</span><span class="ctl dim"><input value="${v}" readonly></span></div>`;
+  return `<div class="grp">SYSTEM INFORMATION:</div>
+    ${kv('Product Name', M.model)}
+    ${kv('Serial Number', M.sn)}
+    ${kv('System ROM', M.rom)}
+    ${kv('Processor', 'Intel(R) Xeon(R) Bronze 3408U (8 cores)')}
+    ${kv('Total Memory', '16 GB')}
+    ${kv('iLO IPv4', M.ilo)}
+    ${kv('Secure Boot', sb.bios.secureBoot)}
+    ${kv('Boot Mode', sb.bios.bootMode)}
+    <div class="grp">STORAGE:</div>
+    ${kv('Storage Controller', M.ctrl+' ('+M.slot+')')}
+    ${kv('Physical Drives', n+'  ('+kinds+')')}
+    ${kv('Total Raw Capacity', fmtCapShort(tot))}
+    ${kv('Arrays / Logical Drives', arrays+' / '+lds)}
+    ${sbBanner('読み取り専用ビュー。ドライブ構成や RAID 作成の結果がここに反映されます。')}`;
+}
+
+// サンドボックス専用の追加画面のみ登録（メニュー画面は実機ツリーを共用＝下の override 方式）
+Object.assign(SCREENS, {
+  sysinfo:    { type:'hii', h1:'System Information', title:'System Information', crumbs:['🏠 System Utilities','System Information'], main:'' },
+  sb_diskcfg: { type:'hii', h1:'System Configuration', title:'Physical Drive Configuration（🧪 Sandbox Tool）', crumbs:['🏠 System Utilities','System Configuration','🧪 Drive Configuration'], main:'' },
+  sb_drive:   { type:'hii', h1:'System Configuration', title:'Drive', crumbs:['☰ More Forms','Drive Management','Drive'], main:'' },
+  sb_ctrlmgmt:{ type:'hii', h1:'System Configuration', title:'Controller Management', crumbs:['🏠 System Utilities',`Slot 14: ${M.ctrl}`,'Main Menu','Controller Management'], main:'' },
+  sb_advctrl: { type:'hii', h1:'System Configuration', title:'Advanced Controller Management', crumbs:['☰ More Forms','Controller Management','Advanced Controller Management'], main:'' },
+  sb_power:   { type:'hii', h1:'BIOS/Platform Configuration (RBSU)', title:'Power and Performance Options', crumbs:['🏠 System Utilities','BIOS/Platform Configuration (RBSU)','Power and Performance Options'], main:'', foot:{pending:true} },
+  sb_boot:    { type:'hii', h1:'BIOS/Platform Configuration (RBSU)', title:'Boot Options', crumbs:['🏠 System Utilities','BIOS/Platform Configuration (RBSU)','Boot Options'], main:'', foot:{pending:true} }
+});
+
+/* buildMain 拡張：
+   - sandboxOnly … サンドボックス専用の追加画面
+   - sandboxOverrides … 実機と共用の画面を、サンドボックス時だけデータ駆動版へ差し替え
+   - rail 復帰時は静的main（_buildMainが再生成しない画面）を原本へ戻し、本番手順を無改変に保つ */
+const sandboxOnly = { sysinfo:sbSysinfoMain, sb_diskcfg:sbDiskcfgMain, sb_drive:sbDriveMain, sb_power:sbPowerMain, sb_boot:sbBootMain, sb_ctrlmgmt:sbCtrlmgmtMain, sb_advctrl:sbAdvctrlMain };
+const sandboxOverrides = {
+  sysutil:sbSysutilMain, sysconfig:sbSysconfigMain, props:sbPropsMain, mainmenu:sbMainmenuMain,
+  configmgmt:sbConfigmgmtMain, create:sbCreateMain, drives:sbDrivesMain, ldmgmt:sbLdmMain,
+  drivemgmt:sbDmMain, rbsu:sbRbsuMain, rbsu_sysopt:sbSysoptMenuMain, rbsu_avail:sbAvailMain,
+  rbsu_security:sbSecurityMenuMain, rbsu_secureboot:sbSecureMain
+};
+const _origMain = {};
+['sysutil','configmgmt','drives','rbsu','rbsu_sysopt','rbsu_security'].forEach(id=>{ _origMain[id]=SCREENS[id].main; });
+const _buildMain = buildMain;
+buildMain = function(id){
+  if(sandboxOnly[id]){ SCREENS[id].main = sandboxOnly[id](); return; }
+  if(mode==='sandbox' && sandboxOverrides[id]){ SCREENS[id].main = sandboxOverrides[id](); return; }
+  if(mode==='rail' && _origMain[id]!==undefined){ SCREENS[id].main = _origMain[id]; }
+  _buildMain(id);
+};
+
+// capBar にサンドボックスチップ（モードで識別）
+const _capBar = capBar;
+capBar = function(h1){
+  const chip = (mode==='sandbox') ? '<span class="sbchip">SANDBOX</span>' : '';
+  return `<div class="cap"><span class="logo"></span><h1>${h1}${chip}</h1>
+    <span class="icons">🔧 ? 🔍 🌐 ⟳ 🗄</span></div>`;
+};
+
+/* ---- モード切替（サンドボックスも POST から開始＝実機同様に F9 で入る） ---- */
+let mode = 'rail';
+function enterRail(){
+  mode='rail';
+  document.getElementById('modeRail').classList.add('on');
+  document.getElementById('modeSb').classList.remove('on');
+  document.getElementById('sbDiskBtn').style.display='none';
+  hist=[]; render('post');
+}
+function enterSandbox(){
+  mode='sandbox';
+  document.getElementById('modeSb').classList.add('on');
+  document.getElementById('modeRail').classList.remove('on');
+  document.getElementById('sbDiskBtn').style.display='';
+  hist=[]; render('post');
+}
+function resetCurrent(){
+  if(mode==='sandbox'){ sb=SBDEF(); hist=[]; render('post'); }
+  else { resetAll(); }
+}
+
+/* ---- キーボードナビ（サンドボックス時：矢印フォーカス移動＋Enter） ---- */
+let kbIndex=0;
+function sbFocusables(){ return [...document.querySelectorAll('#stage .row.menu:not(.inert), #stage .mvbtn:not([disabled])')]; }
+function sbApplyFocus(){
+  const els=sbFocusables();
+  if(kbIndex>=els.length) kbIndex=els.length-1;
+  if(kbIndex<0) kbIndex=0;
+  els.forEach((e,i)=>e.classList.toggle('kbfocus', i===kbIndex));
+  if(els[kbIndex]) els[kbIndex].scrollIntoView({block:'nearest'});
+}
+document.addEventListener('keydown', e=>{
+  if(mode!=='sandbox') return;
+  if(document.getElementById('overlay').classList.contains('on')) return;
+  const els=sbFocusables();
+  if(e.key==='ArrowDown'){ e.preventDefault(); kbIndex=Math.min(kbIndex+1, els.length-1); sbApplyFocus(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); kbIndex=Math.max(kbIndex-1,0); sbApplyFocus(); }
+  else if(e.key==='Enter'){ if(els[kbIndex]){ e.preventDefault(); els[kbIndex].click(); } }
+});
+// 描画のたびにフォーカス初期化（サンドボックス時のみ・render をラップ）
+const _render = render;
+render = function(id){
+  _render(id);
+  if(mode==='sandbox'){ kbIndex=0; sbApplyFocus(); }
+};
+
+// 起動
+render('post');
+</script>
+</body>
+</html>

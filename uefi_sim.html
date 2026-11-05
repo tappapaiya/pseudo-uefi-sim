@@ -125,8 +125,31 @@
   /* POST */
   .post{background:#000;color:#cfd6dd;font-family:Consolas,'SFMono-Regular',monospace;
     font-size:13px;line-height:1.7;padding:22px 26px;flex:1;display:flex;flex-direction:column;}
-  @keyframes postfill{0%{width:3%}80%{width:92%}100%{width:100%}}
-  .postbar{height:100%;background:#00a982;width:3%;animation:postfill 5.5s cubic-bezier(.4,.1,.2,1) infinite;}
+  .postbar{height:100%;background:#00a982;width:0;transition:width .6s ease-out;}
+  /* POST の各行：時間とともに表示（.on で出現） */
+  .post .pl{visibility:hidden;}
+  .post .pl.on{visibility:visible;}
+  .fkey.armed b{background:#00a982;color:#fff;}
+  .foot .postskip{margin-left:auto;cursor:pointer;color:#5b6470;border:1px solid #c2c9d0;background:#dfe4e9;
+    padding:3px 10px;border-radius:2px;white-space:nowrap;}
+  .foot .postskip:hover{background:var(--hl);border-color:var(--hl);color:#fff;}
+  /* ===== 実機風キー操作（↑↓で選択バーが動く・Enterで決定） ===== */
+  /* 選択中の行＝実機と同じく緑のバー1本だけ（静的な .sel は操作レイヤーが外す） */
+  .main .row.kbsel{background:var(--hl);color:#fff;}
+  .main .row.kbsel .lbl,.main .row.kbsel .arrow{color:#fff!important;}
+  .main .row.menu.inert.kbsel{background:#9aa2ab;}
+  .main .row.rail.kbsel::after{color:#fff;}
+  .main .chk.kbsel{background:var(--hl);color:#fff;}
+  table.t tr.kbsel td{background:#c7eee0;}
+  .mvbtn.kbsel{background:var(--hl);color:#fff;border-color:var(--hl);}
+  /* ドロップダウンを Enter で開いたときの選択肢ポップアップ */
+  #hiipop{position:absolute;z-index:40;background:#fff;border:1px solid #7a828b;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);min-width:200px;font-size:13px;display:none;}
+  #hiipop.on{display:block;}
+  #hiipop .o{padding:6px 12px;cursor:pointer;white-space:nowrap;color:#2a2c31;}
+  #hiipop .o.cur{background:var(--hl);color:#fff;}
+  /* ダイアログのボタン：キーボードで選択中のボタンを明示 */
+  .dlg .btns button:focus{outline:2px solid #1c1e24;outline-offset:2px;}
   .fkey{cursor:pointer;}
   .fkey b{background:#fff;color:#000;padding:2px 8px;border-radius:3px;}
   .fkey.off b{background:none;border:1px solid #6b7681;color:#cfd6dd;}
@@ -467,6 +490,7 @@
   <div id="stage"></div>
 
   <div id="overlay"><div class="dlg" id="dlg"></div></div>
+  <div id="hiipop"></div>
 
   <div class="helpwrap">
   <details class="note">
@@ -476,8 +500,10 @@
     操作：緑の「<b>◀ 次はここ</b>」を順にクリックすると RAID作成〜グローバルホットスペア指定まで通しで進みます。
     <b>戻る＝ESCキー</b>／上部パンくずクリック（実機準拠）。<br>
     キー：<b>F9</b>＝System Utilities起動〔手順A〜C〕／<b>F10</b>＝Intelligent Provisioning起動〔手順D・OSインストール〕（いずれもPOST時）／<b>F7</b>＝既定値／<b>F10</b>＝保存（ユーティリティ内）／<b>F12</b>＝保存して終了・再起動。下部バーのボタンでも同じ操作可。<br>
+    <b>実機風のキー操作</b>（両モード共通）：<b>↑↓</b>で緑の選択バーを移動、<b>Enter</b>で決定。ドロップダウンは Enter で選択肢が開き、↑↓→Enter で確定（ESCで取消）。ダイアログは <b>Enter</b>＝選択中のボタン／<b>ESC</b>＝No・Cancel／<b>←→</b>でボタン移動（Confirm 欄は Enter でチェック）。
+    <b>POST</b> は時間とともに起動処理が進み、途中で押した F9/F10/F11 は受け付けておいて <b>POST完了後に</b>入ります（⏭スキップ可）。保存して再起動したときも POST から立ち上がります。<br>
     <b>手順D（IP）はグラフィカルGUI</b>（UEFIの青画面とは別物）。DL385 Gen11のHPE公式スクショに準拠し、本機構成（MR408i-o／HDD／WS2022／日本語）に合わせた擬似再現です。<br>
-    <b>🧪 サンドボックス（自由試行）モード</b>（上部の切替ボタン）：検証済みの本番手順とは別に、<b>ドライブ本数（2〜10本）・容量・種別を自由に変えて RAID 0/1/5/10 を試作</b>できるデータ駆動モードです。本数不足など要件を満たさない選択はエラー表示（実機同様）。BIOS（System/Power/Boot Order/Security）や System Information も編集・確認できます。<b>矢印キーでフォーカス移動・Enterで決定</b>にも対応。※こちらは自由試行用の擬似で、実素材との1:1縛りは外しています。
+    <b>🧪 サンドボックス（自由試行）モード</b>（上部の切替ボタン）：検証済みの本番手順とは別に、<b>ドライブ本数（2〜10本）・容量・種別を自由に変えて RAID 0/1/5/10 を試作</b>できるデータ駆動モードです。本数不足など要件を満たさない選択はエラー表示（実機同様）。BIOS（System/Power/Boot Order/Security）や System Information も編集・確認できます。※こちらは自由試行用の擬似で、実素材との1:1縛りは外しています。
     ※ブラウザによっては F12 が開発者ツールに取られるため、下部バーの「F12: Save and Exit」ボタン推奨。左下 Exit の厳密な挙動は実機で要確認。<br>
     <b>画面の見方</b>：白い枠内のメニュー・項目名は<b>実機どおり英語</b>。<span style="color:#7f8fe0;font-weight:700">青紫の枠（操作メモ）</span>と緑の「◀ 次はここ」は<b>こちらが足した日本語ガイド</b>で、実機画面には表示されません。
   </details>
@@ -552,7 +578,7 @@
   </details>
   </div>
 
-  <div class="lastupd">最終更新: 2026-09-29</div>
+  <div class="lastupd">最終更新: 2026-11-05</div>
 
 <script>
 /* ============================================================
@@ -694,31 +720,33 @@ function renderHii(s){
   </section>`;
 }
 
-// POST画面（特殊）
+// POST画面（特殊）— 実機同様に時間とともに起動処理が進む（各行に data-t＝表示開始ms）。
+// 文言は従来の静的POST画面のものだけを使い、出す順番とタイミングだけを演出（新しい文言は足さない）。
 function renderPost(){
   return `<section class="screen">
-    <div class="post">
-      <div style="font-size:26px;font-weight:700;color:#fff;letter-spacing:.03em;margin-bottom:14px;">HPE ProLiant</div>
-      <div style="height:10px;width:40%;border:1px solid #3a4a55;margin-bottom:16px;overflow:hidden;">
-        <div class="postbar"></div></div>
-      (C) Copyright 1982-2026 Hewlett Packard Enterprise Development LP<br>
+    <div class="post" id="postScr">
+      <div class="pl" data-t="300" style="font-size:26px;font-weight:700;color:#fff;letter-spacing:.03em;margin-bottom:14px;">HPE ProLiant</div>
+      <div class="pl" data-t="300" style="height:10px;width:40%;border:1px solid #3a4a55;margin-bottom:16px;overflow:hidden;">
+        <div class="postbar" id="postBar"></div></div>
+      <div class="pl" data-t="800">(C) Copyright 1982-2026 Hewlett Packard Enterprise Development LP<br>
       HPE ${M.model}<br>
       System ROM Version: ${M.rom} (03/23/2023)<br>
-      Serial Number: ${M.sn}<br><br>
-      Installed System Memory: 16 GB, Available System Memory: 16 GB<br>
-      1 Processor(s) detected, 8 total cores enabled<br>
-      Proc 1: Intel(R) Xeon(R) Bronze 3408U<br><br>
-      Secure Boot: ${state.secureBoot}<br>
-      Starting required devices. Please wait, this may take a few moments....<br><br>
-      <span style="color:#00a982;">iLO 6 IPv4: ${M.ilo}</span><br>
-      <div style="margin-top:auto;display:flex;gap:26px;padding-top:20px;font-size:13px;">
-        <span class="fkey" onclick="go('sysutil')"><b>F9</b> System Utilities</span>
-        <span class="fkey" onclick="go('ip_boot')"><b>F10</b> Intelligent Provisioning</span>
-        <span class="fkey" onclick="go('bootmenu')"><b>F11</b> Boot Menu</span>
+      Serial Number: ${M.sn}<br><br></div>
+      <div class="pl" data-t="1900">Installed System Memory: 16 GB, Available System Memory: 16 GB<br></div>
+      <div class="pl" data-t="2300">1 Processor(s) detected, 8 total cores enabled<br>
+      Proc 1: Intel(R) Xeon(R) Bronze 3408U<br><br></div>
+      <div class="pl" data-t="3000">Secure Boot: ${state.secureBoot}<br></div>
+      <div class="pl" data-t="3300">Starting required devices. Please wait, this may take a few moments<span id="postDots"></span><br><br></div>
+      <div class="pl" data-t="4700"><span style="color:#00a982;">iLO 6 IPv4: ${M.ilo}</span><br></div>
+      <div class="pl" data-t="800" style="margin-top:auto;display:flex;gap:26px;padding-top:20px;font-size:13px;">
+        <span class="fkey" id="fk-sysutil" onclick="postKey('sysutil')"><b>F9</b> System Utilities</span>
+        <span class="fkey" id="fk-ip_boot" onclick="postKey('ip_boot')"><b>F10</b> Intelligent Provisioning</span>
+        <span class="fkey" id="fk-bootmenu" onclick="postKey('bootmenu')"><b>F11</b> Boot Menu</span>
         <span class="fkey off"><b>F12</b> Network Boot</span>
       </div>
     </div>
-    <div class="foot"><span style="color:#5b6470;">POST Code : 0040 &nbsp;&nbsp;（<b>F9</b>＝System Utilities〔手順A〜C〕／<b>F10</b>＝Intelligent Provisioning〔手順D〕／<b>F11</b>＝One-Time Boot Menu〔手順E・ファーム更新〕）</span></div>
+    <div class="foot"><span style="color:#5b6470;" id="postMsg">POST Code : 0040 &nbsp;&nbsp;（<b>F9</b>＝System Utilities〔手順A〜C〕／<b>F10</b>＝Intelligent Provisioning〔手順D〕／<b>F11</b>＝One-Time Boot Menu〔手順E・ファーム更新〕）</span>
+      <span class="postskip" id="postSkip" onclick="postSkip()" title="起動演出を飛ばしてPOST完了状態にします（練習用）">⏭ スキップ</span></div>
   </section>`;
 }
 
@@ -2722,6 +2750,229 @@ render = function(id){
   _render(id);
   if(mode==='sandbox'){ kbIndex=0; sbApplyFocus(); }
 };
+
+/* ============================================================
+   ★ 実機風の操作レイヤー（オンレール／サンドボックス共通・2026-11-05）
+   ① POST：時間とともに起動処理が進む。POST中に押したF9/F10/F11は受け付けておき、POST完了後に入る。
+   ② HII画面：↑↓で緑の選択バーが動き、Enterで決定（ドロップダウンは選択肢ポップアップ→↑↓→Enter）。
+   ③ ダイアログ：Enter＝選択中のボタン、ESC＝No/Cancel、←→でボタン移動。開いている間は背後の画面に操作が漏れない。
+   既存の画面データ・手順ロジックには手を入れず、render/showDlg を包む＋キー入力を先取りする方式。
+   ============================================================ */
+
+/* ---- ① POST の進行 ---- */
+const POST_END = 5600;                                   // POST完了までのms（実機より短縮）
+const POST_KEY = { sysutil:'F9', ip_boot:'F10', bootmenu:'F11' };
+const POST_DEST = { sysutil:'System Utilities', ip_boot:'Intelligent Provisioning', bootmenu:'One-Time Boot Menu' };
+let postPending = null, postDone = false;
+function postStart(){
+  postPending = null; postDone = false;
+  const scr = document.getElementById('postScr'); if(!scr) return;
+  scr.querySelectorAll('.pl').forEach(el=>{ fwT(+el.dataset.t||0, ()=>el.classList.add('on')); });
+  const bar = document.getElementById('postBar');
+  [[400,6],[1200,20],[2000,34],[2600,47],[3400,60],[4200,74],[5000,88]]
+    .forEach(([t,w])=>fwT(t, ()=>{ if(bar) bar.style.width = w+'%'; }));
+  for(let i=1;i<=4;i++) fwT(3300+i*350, ()=>{ const d=document.getElementById('postDots'); if(d) d.textContent='.'.repeat(i); });
+  fwT(POST_END, postFinish);
+}
+function postMsg(html){ const m=document.getElementById('postMsg'); if(m) m.innerHTML=html; }
+function postFinish(){
+  if(current!=='post') return;
+  postDone = true;
+  document.querySelectorAll('#postScr .pl').forEach(el=>el.classList.add('on'));
+  const bar=document.getElementById('postBar'); if(bar) bar.style.width='100%';
+  const d=document.getElementById('postDots'); if(d) d.textContent='....';
+  const sk=document.getElementById('postSkip'); if(sk) sk.style.display='none';
+  if(postPending){ const dest=postPending; fwT(600, ()=>{ if(current==='post') go(dest); }); return; }
+  postMsg(`POST Code : 0040 &nbsp;&nbsp;POST完了。<b>F9</b>＝System Utilities／<b>F10</b>＝Intelligent Provisioning／<b>F11</b>＝One-Time Boot Menu
+    <br><span style="font-size:11px">※実機はこのまま待つと起動デバイス（OS）へ進みます。練習用に、このシミュレータではここで止めています。</span>`);
+}
+function postKey(dest){
+  if(postDone){ go(dest); return; }
+  if(postPending) return;                                 // 最初に押したキーが有効
+  postPending = dest;
+  const fk=document.getElementById('fk-'+dest); if(fk) fk.classList.add('armed');
+  postMsg(`<b>${POST_KEY[dest]}</b> を受け付けました → POSTが終わると <b>${POST_DEST[dest]}</b> に入ります。<span style="font-size:11px">（実機も押した瞬間には切り替わらず、起動処理の完了を待ちます）</span>`);
+}
+function postSkip(){ fwClearTimers(); postFinish(); }
+
+/* ---- ② HII画面のキーボード選択 ---- */
+let kbIdx = 0;
+const kbMemo = {};                                        // 画面ごとに最後の選択位置を覚える（ESCで戻ったとき復元）
+function kbScreenOk(){ const s=SCREENS[current]; return !!s && s.type==='hii'; }
+function kbItems(){
+  if(!kbScreenOk()) return [];
+  return [...document.querySelectorAll('#stage .main .row, #stage .main .chk, #stage .main tr[onclick], #stage .main .mvbtn:not([disabled])')]
+    .filter(el=>{
+      if(el.classList.contains('row')){
+        if(el.classList.contains('dim')) return false;
+        if(el.classList.contains('menu')) return true;
+        return !!el.querySelector('select:not([disabled]), input:not([readonly]):not([disabled])');
+      }
+      if(el.classList.contains('chk')) return !el.classList.contains('dis') && !!el.querySelector('input[type=checkbox]');
+      return true;
+    });
+}
+function kbSet(i, scroll){
+  const els = kbItems(); if(!els.length) return;
+  kbIdx = Math.max(0, Math.min(i, els.length-1));
+  els.forEach((e,j)=>e.classList.toggle('kbsel', j===kbIdx));
+  if(scroll!==false) els[kbIdx].scrollIntoView({block:'nearest'});
+}
+function kbInit(id, same){
+  const els = kbItems(); if(!els.length) return;
+  // 実機の選択バーは1本だけ：静的に付いていた .sel は外し、キーボード選択に置き換える
+  document.querySelectorAll('#stage .main .row.sel').forEach(r=>r.classList.remove('sel'));
+  let i = 0;
+  if(same) i = kbIdx;                                     // 同じ画面の再描画（値の変更など）は位置を保つ
+  else {
+    const r = els.findIndex(e=>e.classList.contains('rail'));
+    if(mode==='rail' && r>=0) i = r;                      // オンレールは「◀次はここ」に選択バーを置く
+    else if(kbMemo[id]!=null) i = kbMemo[id];
+  }
+  kbSet(i, same ? false : true);
+  if(!same){ const m=document.querySelector('#stage .main'); if(m && i===0) m.scrollTop=0; }
+}
+function kbActivate(){
+  const el = kbItems()[kbIdx]; if(!el) return;
+  if(el.classList.contains('row')){
+    const sel = el.querySelector('select:not([disabled])');
+    if(sel){ popOpen(sel); return; }
+    const inp = el.querySelector('input:not([readonly]):not([disabled]):not([type=checkbox])');
+    if(inp){ inp.focus(); inp.select(); return; }
+  }
+  if(el.classList.contains('chk') && !el.getAttribute('onclick')){
+    const cb = el.querySelector('input[type=checkbox]'); if(cb) cb.click(); return;
+  }
+  el.click();
+}
+// マウスで行に乗ったら選択バーも移動（マウスとキーボードで選択が二重にならないように）
+document.getElementById('stage').addEventListener('mouseover', e=>{
+  if(popState) return;
+  const els = kbItems(); if(!els.length) return;
+  let hit = -1; els.forEach((el,j)=>{ if(el.contains(e.target)) hit=j; });
+  if(hit>=0 && hit!==kbIdx) kbSet(hit, false);
+});
+
+/* ---- ドロップダウンの選択肢ポップアップ（Enterで開く） ---- */
+let popState = null;                                      // {sel, idx}
+function popOpen(sel){
+  const box = document.getElementById('hiipop');
+  box.innerHTML = '';
+  [...sel.options].forEach((o,i)=>{
+    const d=document.createElement('div'); d.className='o'; d.textContent=o.text;
+    d.onmouseenter=()=>{ popState.idx=i; popPaint(); };
+    d.onclick=()=>{ popState.idx=i; popCommit(); };
+    box.appendChild(d);
+  });
+  const r = sel.getBoundingClientRect();
+  box.style.left = (r.left+window.scrollX)+'px';
+  box.style.top  = (r.bottom+window.scrollY+2)+'px';
+  box.style.minWidth = r.width+'px';
+  popState = { sel, idx: Math.max(0, sel.selectedIndex) };
+  box.classList.add('on'); popPaint();
+}
+function popPaint(){ if(!popState) return;
+  [...document.querySelectorAll('#hiipop .o')].forEach((d,i)=>d.classList.toggle('cur', i===popState.idx)); }
+function popHide(){ popState=null; const b=document.getElementById('hiipop'); if(b){ b.classList.remove('on'); b.innerHTML=''; } }
+function popCommit(){
+  const p = popState; popHide(); if(!p) return;
+  if(p.sel.selectedIndex!==p.idx){
+    p.sel.selectedIndex = p.idx;
+    p.sel.dispatchEvent(new Event('change', {bubbles:true}));   // 既存の onchange（setWol 等）をそのまま動かす
+  }
+}
+document.addEventListener('mousedown', e=>{ if(popState && !document.getElementById('hiipop').contains(e.target)) popHide(); });
+
+/* ---- ③ ダイアログ：開いたら既定ボタンにフォーカス ---- */
+function dlgOpen(){ return document.getElementById('overlay').classList.contains('on'); }
+function dlgFocusables(){
+  return [...document.querySelectorAll('#dlg input[type=checkbox], #dlg .btns button')];
+}
+const _showDlg = showDlg;
+showDlg = function(html){
+  popHide();
+  _showDlg(html);
+  const cb = document.querySelector('#dlg input[type=checkbox]:not(:checked)');      // Confirm 付きはまずチェック欄へ
+  const pri = document.querySelector('#dlg .btns button.pri') || [...document.querySelectorAll('#dlg .btns button')].pop();
+  const f = cb || pri; if(f) f.focus({preventScroll:true});
+};
+function dlgCancelBtn(){
+  const btns = [...document.querySelectorAll('#dlg .btns button')];
+  return btns.find(b=>/^(No|Cancel|キャンセル|いいえ)/.test(b.textContent.trim()))
+      || (btns.length>1 ? btns.find(b=>!b.classList.contains('pri')) : null);
+}
+
+/* ---- render を包む：POST進行の開始・選択バーの初期化 ---- */
+sbApplyFocus = function(){};                              // 旧サンドボックス専用の矢印フォーカスは本レイヤーに統合
+const _renderReal = render;
+render = function(id){
+  const prev = current;
+  if(prev!==id && kbScreenOk()) kbMemo[prev] = kbIdx;
+  popHide();
+  _renderReal(id);
+  if(id==='post') postStart();
+  kbInit(id, prev===id);
+};
+
+/* ---- キー入力の先取り（capture）：状況ごとに処理し、既存ハンドラへ漏らさない ---- */
+window.addEventListener('keydown', e=>{
+  const k = e.key;
+  const stop = ()=>{ e.preventDefault(); e.stopImmediatePropagation(); };
+  // 1) 選択肢ポップアップ
+  if(popState){
+    const n = popState.sel.options.length;
+    if(k==='ArrowDown'){ popState.idx=Math.min(popState.idx+1,n-1); popPaint(); }
+    else if(k==='ArrowUp'){ popState.idx=Math.max(popState.idx-1,0); popPaint(); }
+    else if(k==='Enter'){ popCommit(); }
+    else if(k==='Escape'){ popHide(); }
+    stop(); return;
+  }
+  // 2) ダイアログ表示中：背後の画面（ESC=戻る、Fキー等）には一切渡さない
+  if(dlgOpen()){
+    const a = document.activeElement, dlg = document.getElementById('dlg');
+    if(k==='Escape'){ stop(); const c=dlgCancelBtn(); if(c) c.click(); return; }
+    if(k==='ArrowLeft' || k==='ArrowRight'){
+      stop(); const f=dlgFocusables(); if(!f.length) return;
+      let i=f.indexOf(a); i = (i<0) ? f.length-1 : (i + (k==='ArrowRight'?1:-1) + f.length) % f.length;
+      f[i].focus(); return;
+    }
+    if(k==='Enter'){
+      stop();
+      if(a && dlg.contains(a)){
+        if(a.type==='checkbox'){ a.click(); const pri=dlg.querySelector('.btns button.pri'); if(a.checked && pri) pri.focus(); return; }
+        if(a.tagName==='BUTTON'){ if(!a.disabled) a.click(); return; }
+      }
+      const pri = dlg.querySelector('.btns button.pri'); if(pri && !pri.disabled) pri.click(); return;
+    }
+    if(/^F\d+$/.test(k) || k.startsWith('Arrow')){ stop(); return; }
+    e.stopImmediatePropagation(); return;                 // Tab/Space はブラウザ標準（ボタン移動・チェック）
+  }
+  // 3) 入力欄・ドロップダウンを直接クリックして編集中
+  const a = document.activeElement;
+  if(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && document.getElementById('stage').contains(a)){
+    if(k==='Escape' || (k==='Enter' && a.tagName==='INPUT')){ stop(); a.blur(); return; }
+    if(k.startsWith('Arrow') || k==='Enter' || k===' '){ e.stopImmediatePropagation(); return; }
+    return;                                               // Fキーは従来どおり（F10保存など）
+  }
+  // 4) POST：F9/F10/F11 は受付→POST完了後に遷移
+  if(current==='post'){
+    const d = {F9:'sysutil', F10:'ip_boot', F11:'bootmenu'}[k];
+    if(d){ stop(); postKey(d); return; }
+    if(k.startsWith('Arrow') || k==='Enter'){ stop(); }
+    return;
+  }
+  // 5) HII画面：↑↓/Home/End で選択バー、Enter で決定
+  if(kbScreenOk()){
+    if(k==='ArrowDown'){ stop(); kbSet(kbIdx+1); return; }
+    if(k==='ArrowUp'){ stop(); kbSet(kbIdx-1); return; }
+    if(k==='Home'){ stop(); kbSet(0); return; }
+    if(k==='End'){ stop(); kbSet(1e9); return; }
+    if(k==='Enter'){ stop(); kbActivate(); return; }
+    return;
+  }
+  // それ以外（IP/SUM などのグラフィカル画面）は旧サンドボックスの矢印処理を止めるだけ
+  if(k.startsWith('Arrow') || k==='Enter') e.stopImmediatePropagation();
+}, true);
 
 // 起動
 render('post');

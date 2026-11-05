@@ -5,6 +5,8 @@
 <!-- レイアウト幅を1024pxに固定：スマホでは全体が縮小表示され、ピンチ拡大で操作できる（画面幅に合わせて縮んで潰れるのを防ぐ）。PCは従来どおり。 -->
 <meta name="viewport" content="width=1024">
 <title>擬似UEFI システムユーティリティ（RAID/BIOS/iLO/OSインストール）— DL320 Gen11 / MR408i-o</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 <style>
   :root{
     --bar:#3c4a54;        /* キャプションバー */
@@ -526,6 +528,63 @@
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23302e31' stroke-width='1.4'/%3E%3C/svg%3E");
     background-repeat:no-repeat;background-position:right 7px center;}
   .main input{padding-right:8px;}
+
+  /* ===== POST：実機（DL320 Gen11）実画面準拠 ===== */
+  .post{background:#000;color:#f2f2f2;font-family:"VT323","Courier New",monospace;font-size:23.5px;line-height:17px;padding:0 0 14px;}
+  .post .posthead{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 0 8px 34px;
+    background:linear-gradient(180deg,#2c2c2c 0%,#141414 60%,#000 100%);}
+  .post .posttitle{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;font-weight:700;font-size:38px;line-height:1;color:#fff;letter-spacing:.01em;}
+  .post .postbarbox{width:386px;height:16px;margin-top:12px;border:2px solid #555;border-radius:3px;background:#000;overflow:hidden;}
+  .post .postbar{height:100%;width:0;border-radius:1px;transition:width .6s ease-out;
+    background:linear-gradient(180deg,#00c79c 0%,#00a982 55%,#047a63 100%);}
+  .post .hpelogo{display:flex;flex-direction:column;color:#fff;line-height:1.05;padding-right:22px;
+    font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;}
+  .post .hpelogo i{display:block;width:40px;height:10px;border:2.5px solid #01a982;margin-bottom:5px;}
+  .post .hpelogo b{font-size:15px;}
+  .post .hpelogo span{font-size:15px;}
+  .post .postlog{padding:10px 14px 0;}
+  .post .postlog .pl,.post .postlog.pl{white-space:pre;}
+  .post .postkeys{display:flex;gap:30px;padding:22px 12px 0;align-items:center;}
+  .post .fkey{display:inline-flex;align-items:center;gap:9px;}
+  .post .fkey b{display:inline-block;min-width:46px;text-align:center;padding:3px 7px;border:2px solid #fff;border-radius:7px;
+    background:#000;color:#fff;font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;font-size:17px;line-height:1.1;font-weight:700;}
+  .post .fkey.off b{border-color:#fff;color:#fff;background:#000;}
+  .post .fkey.armed b{background:#fff;color:#000;}           /* 押されたキー＝白抜き反転（実画面の F9 選択状態） */
+  .post .fkey:hover b{background:#d9d9d9;color:#000;}
+
+  /* ===== 実機スクショ②（MRコントローラ画面）準拠：下部バー・パンくず区画・見出し・読み取り専用欄 ===== */
+  /* 下部バー：帯と同じ紺灰。Exit は白枠、Fキーは灰色の枠ボタン、ラジオは白い丸枠 */
+  .foot{background:var(--bar);border-top:none;color:#fff;padding:10px 26px;gap:22px;font-size:13px;}
+  .foot .exit{border:2px solid #fff;background:transparent;color:#fff;width:140px;text-align:center;padding:3px 0;font-weight:700;}
+  .foot .exit:hover{background:#fff;color:var(--bar);}
+  .foot .rad{color:#8f9aa6;}
+  .foot .rad.on{color:#fff;}
+  .foot .rad::before{width:13px;height:13px;border:2px solid #dfe4e9;background:transparent;}
+  .foot .rad.on::before{background:var(--hl);border-color:#fff;}
+  .foot .fk{gap:16px;}
+  .foot .fk span{background:transparent;border:2px solid #8f9aa6;color:#a9b3bd;padding:3px 18px;border-radius:0;}
+  .foot .fk span:hover{background:transparent;border-color:#fff;color:#fff;}
+  /* パンくず：2つ目以降は少し明るい矢羽根形の区画（家アイコンの項目は帯の色のまま） */
+  .crumbs .c{z-index:0;}
+  .crumbs .c:not(.home)::before{display:block;content:"";position:absolute;top:0;bottom:6px;left:-16px;right:4px;border:none;transform:none;
+    background:#4a596b;z-index:-1;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 50%,calc(100% - 16px) 100%,0 100%,16px 50%);}
+  .crumbs .c:not(.home){padding-left:22px;}
+  .crumbs{padding-bottom:0;}
+  .crumbs .c::after{right:8px;}
+  /* 画面見出し：細字で大きく黒 */
+  .main h2{font-size:30px;font-weight:400;color:#111;margin:0 0 10px;}
+  /* 区切り見出し（PROPERTIES: 等）：大文字・細字 */
+  .grp{font-weight:400;color:#302e31;font-size:14px;letter-spacing:.04em;margin-top:16px;}
+  /* 読み取り専用の値欄：灰色の箱・灰色文字・右寄せ */
+  .main input[readonly],.main .ctl.dim input{background:#e4e4e4;border:1px solid #b9b9b9;color:#8a8a8a;text-align:right;}
+  .main .ctl.dim select,.main select:disabled{color:#a0a0a0;background-color:#fff;}
+  .main .row:not(.menu){padding:5px 6px;}
+
+  /* PROPERTIES の読み取り専用行：ラベルは黒太字、値は右端の小さな灰色箱（Status は無効化ドロップダウン） */
+  .main .row.ro .ctl{display:flex;justify-content:flex-end;}
+  .main .row.ro .ctl input{width:80px;}
+  .main .row.ro .ctl.wide select{width:100%;}
+  .crumbs .c:not(.home)::before{right:10px;}
 </style>
 </head>
 <body>
@@ -697,7 +756,7 @@ function sidebar(){
   return `<aside class="side">
     <div class="info"><div class="model">HPE<br>${M.model}</div>
       Server SN: ${M.sn}<br>iLO IPv4: ${M.ilo}<br>iLO IPv6: ${M.ilo6}<br>User Default: OFF<br>
-      Secure Boot: ${state.secureBoot}<br>System ROM: ${M.rom} (${M.romDate})</div>
+      Secure Boot: ${state.secureBoot}<br>Boot Mode: UEFI<br>System ROM: ${M.rom} (${M.romDate})</div>
     <div class="keys"><b>Enter:</b>Select<br><b>ESC:</b>Exit<br><b>F1:</b>Help<br>
       <b>F7:</b>Load Defaults<br><b>F10:</b>Save<br><b>F12:</b>Save and Exit</div>
   </aside>`;
@@ -784,32 +843,50 @@ function renderHii(s){
   </section>`;
 }
 
-// POST画面（特殊）— 実機同様に時間とともに起動処理が進む（各行に data-t＝表示開始ms）。
-// 文言は従来の静的POST画面のものだけを使い、出す順番とタイミングだけを演出（新しい文言は足さない）。
+// POST画面（特殊）— 実機（DL320 Gen11 実画面スクショ・ユーザー提供）準拠。
+// 時間とともに起動処理が進む（各行に data-t＝表示開始ms）。文言・並びは実画面どおり。
 function renderPost(){
+  const wl = (mode==='sandbox' && typeof sb!=='undefined') ? sb.bios.workloadProfile : 'Custom';
+  const sbt = (mode==='sandbox' && typeof sb!=='undefined') ? sb.bios.secureBoot : state.secureBoot;
   return `<section class="screen">
     <div class="post" id="postScr">
-      <div class="pl" data-t="300" style="font-size:26px;font-weight:700;color:#fff;letter-spacing:.03em;margin-bottom:14px;">HPE ProLiant</div>
-      <div class="pl" data-t="300" style="height:10px;width:40%;border:1px solid #3a4a55;margin-bottom:16px;overflow:hidden;">
-        <div class="postbar" id="postBar"></div></div>
-      <div class="pl" data-t="800">(C) Copyright 1982-2026 Hewlett Packard Enterprise Development LP<br>
-      HPE ${M.model}<br>
-      System ROM Version: ${M.rom} (${M.romDate})<br>
-      Serial Number: ${M.sn}<br><br></div>
-      <div class="pl" data-t="1900">Installed System Memory: 16 GB, Available System Memory: 16 GB<br></div>
-      <div class="pl" data-t="2300">1 Processor(s) detected, 8 total cores enabled<br>
-      Proc 1: Intel(R) Xeon(R) Bronze 3408U<br><br></div>
-      <div class="pl" data-t="3000">Secure Boot: ${state.secureBoot}<br></div>
-      <div class="pl" data-t="3300">Starting required devices. Please wait, this may take a few moments<span id="postDots"></span><br><br></div>
-      <div class="pl" data-t="4700"><span style="color:#00a982;">iLO 6 IPv4: ${M.ilo}</span><br></div>
-      <div class="pl" data-t="800" style="margin-top:auto;display:flex;gap:26px;padding-top:20px;font-size:13px;">
+      <div class="posthead">
+        <div class="pl" data-t="200"><div class="posttitle">HPE ProLiant</div>
+          <div class="postbarbox"><div class="postbar" id="postBar"></div></div></div>
+        <span class="hpelogo pl" data-t="200"><i></i><b>Hewlett Packard</b><span>Enterprise</span></span>
+      </div>
+      <div class="postlog">
+      <div class="pl" data-t="800">(C) Copyright 1982-2023 Hewlett Packard Enterprise Development LP
+HPE ${M.model}
+System ROM Version: ${M.rom} (${M.romDate})
+Serial Number: ${M.sn}
+</div>
+      <div class="pl" data-t="1700">Installed System Memory: 16 GB, Available System Memory: 16 GB
+</div>
+      <div class="pl" data-t="2100">1 Processor(s) detected, 8 total cores enabled, Hyperthreading is not supported
+Proc 1: Intel(R) Xeon(R) Bronze 3408U
+</div>
+      <div class="pl" data-t="2700">Workload Profile: ${wl}
+Power Regulator Mode: Dynamic Power Savings
+Advanced Memory Protection Mode: Advanced ECC Support
+RAS Mode: Firmware First
+Secure Boot: ${sbt}
+Server Configuration Lock: Disabled
+HPE Memory authenticated in all populated DIMM slots.
+</div>
+      <div class="pl" data-t="3300">
+Starting required devices. Please wait, this may take a few moments<span id="postDots"></span></div>
+      </div>
+      <div class="postlog pl" data-t="4700" style="margin-top:auto">iLO 6 IPv4: ${M.ilo}
+iLO 6 IPv6: ${M.ilo6}</div>
+      <div class="postkeys pl" data-t="800">
         <span class="fkey" id="fk-sysutil" onclick="postKey('sysutil')"><b>F9</b> System Utilities</span>
         <span class="fkey" id="fk-ip_boot" onclick="postKey('ip_boot')"><b>F10</b> Intelligent Provisioning</span>
         <span class="fkey" id="fk-bootmenu" onclick="postKey('bootmenu')"><b>F11</b> Boot Menu</span>
         <span class="fkey off"><b>F12</b> Network Boot</span>
       </div>
     </div>
-    <div class="foot"><span style="color:#5b6470;" id="postMsg">POST Code : 0040 &nbsp;&nbsp;（<b>F9</b>＝System Utilities〔手順A〜C〕／<b>F10</b>＝Intelligent Provisioning〔手順D〕／<b>F11</b>＝One-Time Boot Menu〔手順E・ファーム更新〕）</span>
+    <div class="foot"><span style="color:#5b6470;" id="postMsg">（<b>F9</b>＝System Utilities〔手順A〜C〕／<b>F10</b>＝Intelligent Provisioning〔手順D〕／<b>F11</b>＝One-Time Boot Menu〔手順E・ファーム更新〕）</span>
       <span class="postskip" id="postSkip" onclick="postSkip()" title="起動演出を飛ばしてPOST完了状態にします（練習用）">⏭ スキップ</span></div>
   </section>`;
 }
@@ -1040,14 +1117,14 @@ function propsMain(){
   return `
     <div class="row menu"><span class="lbl">Help</span></div>
     <div class="grp">PROPERTIES:</div>
-    <div class="row dim"><span class="lbl">Status</span><span class="ctl dim"><input value="Optimal" readonly></span></div>
-    <div class="row dim"><span class="lbl">Backplane</span><span class="ctl dim"><input value="1" readonly></span></div>
-    <div class="row dim"><span class="lbl">Enclosure</span><span class="ctl dim"><input value="1" readonly></span></div>
-    <div class="row dim"><span class="lbl">Drives</span><span class="ctl dim"><input value="4" readonly></span></div>
-    <div class="row dim"><span class="lbl">JBODs</span><span class="ctl dim"><input value="0" readonly></span></div>
-    <div class="row dim"><span class="lbl">Arrays</span><span class="ctl dim"><input value="${arrays}" readonly></span></div>
-    <div class="row dim"><span class="lbl">Logical Drives</span><span class="ctl dim"><input value="${lds}" readonly></span></div>
-    <div class="row dim"><span class="lbl">ROC Temperature (C)</span><span class="ctl dim"><input value="55" readonly></span></div>
+    <div class="row ro"><span class="lbl">Status</span><span class="ctl ro wide"><select disabled><option>Optimal</option></select></span></div>
+    <div class="row ro"><span class="lbl">Backplane</span><span class="ctl ro"><input value="1" readonly></span></div>
+    <div class="row ro"><span class="lbl">Enclosure</span><span class="ctl ro"><input value="1" readonly></span></div>
+    <div class="row ro"><span class="lbl">Drives</span><span class="ctl ro"><input value="4" readonly></span></div>
+    <div class="row ro"><span class="lbl">JBODs</span><span class="ctl ro"><input value="0" readonly></span></div>
+    <div class="row ro"><span class="lbl">Arrays</span><span class="ctl ro"><input value="${arrays}" readonly></span></div>
+    <div class="row ro"><span class="lbl">Logical Drives</span><span class="ctl ro"><input value="${lds}" readonly></span></div>
+    <div class="row ro"><span class="lbl">ROC Temperature (C)</span><span class="ctl ro"><input value="55" readonly></span></div>
     <div class="row menu rail" onclick="go('mainmenu')" style="margin-top:10px"><span class="lbl">Main Menu</span><span class="arrow">➜</span></div>
     ${chk}`;
 }
@@ -2435,14 +2512,14 @@ function sbPropsMain(){
   return `
     <div class="row menu inert" onclick="sbInert(this)"><span class="lbl">Help</span></div>
     <div class="grp">PROPERTIES:</div>
-    <div class="row dim"><span class="lbl">Status</span><span class="ctl dim"><input value="Optimal" readonly></span></div>
-    <div class="row dim"><span class="lbl">Backplane</span><span class="ctl dim"><input value="1" readonly></span></div>
-    <div class="row dim"><span class="lbl">Enclosure</span><span class="ctl dim"><input value="1" readonly></span></div>
-    <div class="row dim"><span class="lbl">Drives</span><span class="ctl dim"><input value="${n}" readonly></span></div>
-    <div class="row dim"><span class="lbl">JBODs</span><span class="ctl dim"><input value="${jbods}" readonly></span></div>
-    <div class="row dim"><span class="lbl">Arrays</span><span class="ctl dim"><input value="${arrays}" readonly></span></div>
-    <div class="row dim"><span class="lbl">Logical Drives</span><span class="ctl dim"><input value="${lds}" readonly></span></div>
-    <div class="row dim"><span class="lbl">ROC Temperature (C)</span><span class="ctl dim"><input value="55" readonly></span></div>
+    <div class="row ro"><span class="lbl">Status</span><span class="ctl ro wide"><select disabled><option>Optimal</option></select></span></div>
+    <div class="row ro"><span class="lbl">Backplane</span><span class="ctl ro"><input value="1" readonly></span></div>
+    <div class="row ro"><span class="lbl">Enclosure</span><span class="ctl ro"><input value="1" readonly></span></div>
+    <div class="row ro"><span class="lbl">Drives</span><span class="ctl ro"><input value="${n}" readonly></span></div>
+    <div class="row ro"><span class="lbl">JBODs</span><span class="ctl ro"><input value="${jbods}" readonly></span></div>
+    <div class="row ro"><span class="lbl">Arrays</span><span class="ctl ro"><input value="${arrays}" readonly></span></div>
+    <div class="row ro"><span class="lbl">Logical Drives</span><span class="ctl ro"><input value="${lds}" readonly></span></div>
+    <div class="row ro"><span class="lbl">ROC Temperature (C)</span><span class="ctl ro"><input value="55" readonly></span></div>
     <div class="row menu" data-k onclick="go('mainmenu')" style="margin-top:10px"><span class="lbl">Main Menu</span><span class="arrow">➜</span></div>`;
 }
 // Main Menu（実機と同一5項目・未実装はinert）
@@ -2850,7 +2927,7 @@ function postFinish(){
   const d=document.getElementById('postDots'); if(d) d.textContent='....';
   const sk=document.getElementById('postSkip'); if(sk) sk.style.display='none';
   if(postPending){ const dest=postPending; fwT(600, ()=>{ if(current==='post') go(dest); }); return; }
-  postMsg(`POST Code : 0040 &nbsp;&nbsp;POST完了。<b>F9</b>＝System Utilities／<b>F10</b>＝Intelligent Provisioning／<b>F11</b>＝One-Time Boot Menu
+  postMsg(`POST完了。<b>F9</b>＝System Utilities／<b>F10</b>＝Intelligent Provisioning／<b>F11</b>＝One-Time Boot Menu
     <br><span style="font-size:11px">※実機はこのまま待つと起動デバイス（OS）へ進みます。練習用に、このシミュレータではここで止めています。</span>`);
 }
 function postKey(dest){

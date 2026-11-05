@@ -668,6 +668,23 @@
   table.ippt input,table.ippt select{width:110px;padding:4px 6px;border:1px solid #c4c4c4;background:#fff;font-size:12.5px;font-family:inherit;}
   table.ippt tr.dis td{color:#a8a8a8;background:#e6e6e6;}
   table.ippt tr.dis input,table.ippt tr.dis select{background:#ececec;color:#a8a8a8;border-color:#d4d4d4;}
+
+  /* パーティション表：行の編集（緑のサイズ数字→編集モード→✓ Update で確定、残りは＋行） */
+  table.ippt tr.basic td{background:#e6e6e6;}
+  table.ippt tr.basic.editing td,table.ippt tr.addrow td{background:#f4f4f4;}
+  table.ippt tr.basic.committed td,table.ippt tr.basic:not(.dis):not(.editing) td{color:#444;}
+  .ipszlink{color:#01a982;cursor:pointer;text-decoration:none;font-weight:700;}
+  .ipszlink:hover{text-decoration:underline;}
+  .ipico svg{width:20px;height:20px;stroke:#9a9a9a;fill:none;stroke-width:1.3;}
+  .ipok{position:relative;display:inline-block;font-size:24px;line-height:1;color:#b5b5b5;cursor:pointer;font-weight:700;}
+  .ipok.on{color:#01a982;}
+  .ipok .tip{display:none;position:absolute;left:50%;top:26px;transform:translateX(-50%);background:#555;color:#fff;
+    font-style:normal;font-size:11px;font-weight:400;padding:2px 8px;white-space:nowrap;z-index:5;}
+  .ipok:hover .tip{display:block;}
+  .ipplus{font-size:24px;color:#01a982;cursor:pointer;font-weight:700;line-height:1;}
+  table.ippt input.lblin{width:110px;color:#a8a8a8;background:transparent;border:none;border-bottom:1px solid #ccc;}
+  table.ippt tr.editing input:not(.lblin),table.ippt tr.editing select{border:none;border-bottom:1px solid #ccc;background:transparent;}
+  table.ippt tr.addrow input,table.ippt tr.addrow select{border:none;border-bottom:1px solid #ccc;background:transparent;color:#444;}
 </style>
 </head>
 <body>
@@ -813,7 +830,7 @@ const state = {
   // 手順D（Intelligent Provisioning）
   ipLang:'English (US)', ipWizardSkipped:false, ipProxySkipped:false,
   ipMediaVerified:false, ipPrepDone:false, ipOsDd:false,
-  ipSource:null, ipPartSet:false, ipAllowed:false, ipRecPart:true, ipPartSize:null,
+  ipSource:null, ipPartSet:false, ipAllowed:false, ipRecPart:true, ipPartSize:null, ipPartEdit:false, ipPartDraft:null,
   // IP環境設定（メンテナンス→Preferences）
   ipPrefLang:'English (US)', ipPrefTab:'basic', ipPrefDone:false,
   // 手順E（ファーム更新 / SUM）
@@ -833,7 +850,7 @@ function resetAll(){
 }
 function ipReset(){ state.ipLang='English (US)'; state.ipWizardSkipped=false; state.ipProxySkipped=false;
   state.ipMediaVerified=false; state.ipPrepDone=false; state.ipOsDd=false;
-  state.ipSource=null; state.ipPartSet=false; state.ipAllowed=false; state.ipRecPart=true; state.ipPartSize=null;
+  state.ipSource=null; state.ipPartSet=false; state.ipAllowed=false; state.ipRecPart=true; state.ipPartSize=null; state.ipPartEdit=false; state.ipPartDraft=null;
   state.ipPrefLang='English (US)'; state.ipPrefTab='basic'; state.ipPrefDone=false; }
 
 // --- 共通パーツ ---
@@ -1589,50 +1606,72 @@ function ipOsMain(){
       <span style="font-size:11px">※ストレージコントローラーはこの画面には無い（本機MRは非SRでIPから構成不可＝手順AのRAIDが表示されるだけ）。エディション選択の独立画面も無く、上のドロップダウンが版により後半のWindowsセットアップ側「インストールするイメージの選択」に出ることもあるが、選ぶ値は同じ。</span>
       <div class="gbtn" onclick="back()"><span class="k">戻る</span>概要およびインストールへ ➜</div></div>`;
 }
+function ipPct(n){ const v=Math.round(n/M.diskMB*1000)/10; return Number.isInteger(v)?String(v):v.toFixed(1); }
 function ipPartMain(){
-  // 実画面（Gen11・MR408i-o の動画フレーム／ユーザー証言「本当にこうなってた」）準拠：
-  // 推奨パーティションは既定 ON（全容量を Basic data 1本・表はグレーで編集不可）→ OFF にすると Size/PERCENTAGE が編集可能
-  const FULL = M.diskMB, rec = state.ipRecPart, done = state.ipPartSet;
-  const size = rec ? FULL : (state.ipPartSize==null ? FULL : state.ipPartSize);
-  const pct  = Math.round(size/FULL*100);
+  // 実画面（Gen11・MR408i-o の動画フレーム／ユーザー証言）準拠の操作の流れ：
+  // ①推奨パーティション既定 ON（全容量・行はグレー）→ ②トグル OFF → ③緑のサイズ数字をクリックで行が編集モード
+  // → ④サイズ入力（PERCENTAGE は小数1桁で連動）→ ⑤行左の大きな ✓（ツールチップ Update）で確定
+  // → ⑥残り容量の「＋」行が表の先頭に出る（本手順では追加しない）→ ⑦右上 Back to Summary and Install
+  const FULL = M.diskMB, rec = state.ipRecPart, edit = state.ipPartEdit;
+  const size = rec ? FULL : (state.ipPartSize==null ? FULL : state.ipPartSize);   // 確定済みのサイズ
+  const draft = state.ipPartDraft==null ? size : state.ipPartDraft;               // 編集中の値
   const remain = FULL - size;
-  const dis = rec ? ' disabled' : '';
   const target = parseInt(M.partMB.replace(/,/g,''),10);
+  const done = state.ipPartSet;
+  const changed = edit && draft!==size;
+  const ICON_EDIT = `<svg viewBox="0 0 20 20"><rect x="4" y="3" width="12" height="15" rx="1"/><path d="M7.5 3V1.8h5V3M7 8h6M7 11h6M7 14h4"/></svg>`;
+  let basic;
+  if(rec){
+    basic = `<tr class="basic dis"><td class="ck"></td><td>Basic data<br>partition</td><td>${FULL}</td><td>NTFS</td><td></td><td>100</td></tr>`;
+  } else if(!edit){
+    basic = `<tr class="basic${done?' committed':''}"><td class="ck">${done?'':`<span class="ipico" title="Edit">${ICON_EDIT}</span>`}</td><td>Basic data<br>partition</td>
+      <td>${done?size:`<a class="ipszlink${!done?' railb':''}" onclick="ipPartBeginEdit()" title="クリックで編集">${size}</a>`}</td><td>NTFS</td><td></td><td>${ipPct(size)}</td></tr>`;
+  } else {
+    basic = `<tr class="basic editing"><td class="ck"><span class="ipok${changed?' on':''}${changed&&draft===target?' railb':''}" onclick="ipPartCommit()"><i class="tip">Update</i>✓</span></td>
+      <td><input class="lblin" value="Basic data partition" disabled></td>
+      <td><input type="number" class="${draft!==target?'railb':''}" min="1" max="${FULL}" value="${draft}" onchange="ipPartSz(this.value)"></td>
+      <td><select disabled><option>NTFS</option></select></td>
+      <td><input value="" style="width:90px"></td>
+      <td><input type="number" min="0.1" max="100" step="0.1" value="${ipPct(draft)}" style="width:70px" onchange="ipPartPct(this.value)"></td></tr>`;
+  }
+  const head = (!rec && remain>0)
+    ? `<tr class="addrow"><td class="ck"><span class="ipplus" onclick="ipPartAdd()" title="Add">＋</span></td>
+        <td><input class="lblin" placeholder="Basic data partition" disabled></td>
+        <td><input type="number" value="${remain}" disabled></td><td><select disabled><option>NTFS</option></select></td>
+        <td></td><td><input type="number" value="${ipPct(remain)}" disabled style="width:70px"></td></tr>`
+    : '<tr><td colspan="6" class="nrem">No Remaining allocated size for partition</td></tr>';
   return `
     <div class="iptopbtns"><button class="ipbtn ghost${done?' railb':''}" onclick="back()">概要およびインストールに戻る（Back to Summary and Install）</button></div>
     <div class="ipreview">
       ${ipNav('part')}
       <div class="ipcontent">
         <div class="ipsec" style="margin-top:0">OSボリュームのパーティション（OS Volume Partitions）</div>
-        <div class="iptogrow"><span class="ipsw${rec?' on':''}${rec&&!done?' railb':''}" onclick="ipTogRec()" title="クリックで ON/OFF"></span>
+        <div class="iptogrow"><span class="ipsw${rec?' on':''}${rec?' railb':''}" onclick="ipTogRec()" title="クリックで ON/OFF"></span>
           <span>推奨パーティションの使用（Use Recommended Partition）</span></div>
         <div class="ipsmall">Select one following drive to configure as OS drive（OS用ドライブを選択）</div>
         <div class="ipdd2">MR408i-o_Gen11-0065…26200 &nbsp; ${M.disk}<svg viewBox="0 0 16 10"><path d="M1 1l7 7 7-7"/></svg></div>
         <div class="ippanel">
-          <div class="ipsmall" style="text-align:center;min-height:18px">${rec?'All the partitions will be default configured by the selected operating system.':''}</div>
+          ${rec?'<div class="ipsmall" style="text-align:center">All the partitions will be default configured by the selected operating system.</div>':''}
           <div class="ipsegs"><i style="background:#3d4b5c"></i><i style="background:#4f7f73"></i><i style="background:#8a6f66"></i>
             <span class="big" style="flex:${Math.max(size,1)}">Basic data partition (${size} MB)</span>${remain>0?`<span class="free" style="flex:${remain}"></span>`:''}</div>
           <table class="ippt">
             <tr><th></th><th>Mount Point</th><th>Size (MB)</th><th>File System Type</th><th>Partition Label</th><th>PERCENTAGE</th></tr>
-            ${remain===0?'<tr><td colspan="6" class="nrem">No Remaining allocated size for partition</td></tr>':''}
+            ${head}
             <tr><td></td><td>Recovery</td><td>490</td><td>NTFS</td><td></td><td>--</td></tr>
             <tr><td></td><td>EFI system<br>partition</td><td>100</td><td>FAT32</td><td></td><td>--</td></tr>
             <tr><td></td><td>Microsoft<br>reserved<br>partition</td><td>16</td><td>NTFS</td><td></td><td>--</td></tr>
-            <tr class="basic${rec?' dis':''}"><td class="ck">✓</td><td>Basic data partition</td>
-              <td><input type="number" class="${!rec&&!done&&size!==target?'railb':''}" min="1" max="${FULL}" value="${size}"${dis} onchange="ipPartSz(this.value)"></td>
-              <td><select${dis}><option>NTFS</option></select></td>
-              <td><input value=""${dis} style="width:90px"></td>
-              <td><input type="number" min="1" max="100" value="${pct}"${dis} style="width:70px" onchange="ipPartPct(this.value)"></td></tr>
+            ${basic}
           </table>
         </div>
-        <div style="margin-top:12px"><button class="ipbtn${done?'':(!rec&&size===target?' railb':'')}" onclick="ipSetPart()">${done?'✓ アップデート済み':'アップデート（サイズ適用 / Update）'}</button></div>
       </div>
     </div>
-    <div class="anno"><span class="k">操作メモ</span>②c パーティション。既定は<b>「推奨パーティションの使用」＝ON</b>（全容量 ${FULL.toLocaleString()} MB が Basic data 1本・表はグレーで編集不可）。
-      ${rec ? '<b>① トグルをクリックして OFF</b> にすると表が編集可能になります。'
-            : (size!==target ? `<b>② Basic data partition の Size (MB) を <b>${target}</b> に</b>（スピナー ▲▼ か直接入力→Enter）。PERCENTAGE は自動で連動。`
-                             : '<b>③「アップデート」</b>で確定 → 右上「概要およびインストールに戻る」。')}<br>
-      <span style="font-size:11px">※${M.partMB} MB ＝ 100×1024（＝100GB）。<b>本案件はC:を100GBに絞り、残りは未割り当てのまま</b>にしておき、<b>OS導入後に「ディスクの管理」でD:/S:/T:を作成（第6章）</b>。推奨ONのまま進めるとCに全容量が割り当てられる。値は設定シートに従う。</span>
+    <div class="anno"><span class="k">操作メモ</span>②c パーティション。C:（Basic data partition）を <b>${target.toLocaleString()} MB</b> にする。<br>
+      ${rec ? '<b>① 「推奨パーティションの使用」のトグルをクリックして OFF</b>（既定 ON＝全容量がCに割り当てられ、表はグレーで編集不可）。'
+       : !edit && !done ? '<b>② Basic data partition の緑のサイズ数字をクリック</b> → 行が編集モードになる。'
+       : edit && draft!==target ? `<b>③ Size (MB) に ${target} を入力</b>（スピナー ▲▼ か直接入力→Enter）。PERCENTAGE は自動で連動（小数1桁）。`
+       : edit ? '<b>④ 行の左の大きな ✓（Update）をクリック</b>で確定。'
+       : '<b>⑤ 確定済み。</b>表の先頭に残り容量の「＋」行が出ていますが<b>追加しない</b>（残りは未割り当てのまま）。右上の <b>「概要およびインストールに戻る」</b>へ。'}<br>
+      <span style="font-size:11px">※${M.partMB} MB ＝ 100×1024（＝100GB）。<b>本案件はC:を100GBに絞り、残りは未割り当て</b>のまま、<b>OS導入後に「ディスクの管理」でD:/S:/T:を作成（第6章）</b>。値は設定シートに従う。</span>
       ${done?`<div class="gbtn" onclick="back()"><span class="k">次へ</span>概要およびインストールへ戻る ➜</div>`:''}</div>`;
 }
 function ipNav(cur){
@@ -1648,17 +1687,30 @@ function ipNav(cur){
 }
 function ipTogRec(){
   state.ipRecPart = !state.ipRecPart;
-  state.ipPartSet = false;
-  if(state.ipRecPart) state.ipPartSize = null;
+  state.ipPartSet = false; state.ipPartEdit = false; state.ipPartDraft = null; state.ipPartSize = null;
   render('ip_part');
 }
+function ipPartBeginEdit(){ state.ipPartEdit = true; state.ipPartDraft = null; render('ip_part'); }
 function ipPartSz(v){
-  const n = Math.max(1, Math.min(M.diskMB, parseInt(v,10)||M.diskMB));
-  state.ipPartSize = n; state.ipPartSet = false; render('ip_part');
+  state.ipPartDraft = Math.max(1, Math.min(M.diskMB, parseInt(v,10)||M.diskMB)); render('ip_part');
 }
 function ipPartPct(v){
-  const p = Math.max(1, Math.min(100, parseInt(v,10)||100));
-  state.ipPartSize = Math.round(M.diskMB*p/100); state.ipPartSet = false; render('ip_part');
+  const p = Math.max(0.1, Math.min(100, parseFloat(v)||100));
+  state.ipPartDraft = Math.round(M.diskMB*p/100); render('ip_part');
+}
+function ipPartCommit(){
+  // 行左の ✓（Update）：編集中の値で確定
+  const d = state.ipPartDraft;
+  if(d==null) return;
+  state.ipPartSize = d; state.ipPartEdit = false; state.ipPartDraft = null;
+  state.ipPartSet = d < M.diskMB;
+  render('ip_part');
+}
+function ipPartAdd(){
+  showDlg(`<div class="h">Add Partition</div>
+    <div class="c"><div class="msg">Add a partition using the remaining size.</div>
+      <div class="jp"><span class="k">操作メモ</span>残り容量で別のパーティションを追加する「＋」です。<b>本手順では追加しません</b>（残りは未割り当てのまま、OS導入後に「ディスクの管理」で D:/S:/T: を作成）。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg()">OK</button></div>`);
 }
 function ipInstallMain(){
   return `
@@ -1810,21 +1862,11 @@ function ipPrefMain(){
       <br><span style="font-size:11px">⚠ <b>これはIPのUI言語</b>で、<b>インストールされるWindows自体の言語ではない</b>（OS言語は Rapid Setup の「OS設定＞OS言語」で別途 日本語 を指定）。⚠ <b>「システムソフトウェアアップデート＝HPE Webサイト」やDHCP/プロキシは完全オフラインでは機能しない</b>＝オンライン更新は狙わない（ファームは手順E・F11で更新済み）。${state.ipPrefLang!=='日本語'?'<b style="color:#c9761f"> まず言語を日本語に。</b>':'<b style="color:#2f7d68"> ✓ 日本語に設定済み。</b>'}</span>
       <div class="gbtn" onclick="ipPrefSubmit()"><span class="k">送信</span>日本語で確定してホームへ ➜</div></div>`;
 }
-function ipSetPart(){
-  if(state.ipRecPart){
-    showDlg(`<div class="h">OS Volume Partitions</div>
-      <div class="c"><div class="msg">Use Recommended Partition is enabled.</div>
-        <div class="jp"><span class="k">操作メモ</span>推奨パーティションが ON のままです（全容量がCに割り当てられる）。先にトグルを OFF にして、Size (MB) を <b>${M.partMB}</b> にしてください。</div></div>
-      <div class="btns"><button class="pri" onclick="hideDlg()">OK</button></div>`);
-    return;
-  }
-  state.ipPartSet=true; render('ip_part');
-}
 function ipAllow(){
   if(!state.ipPartSet){
     showDlg(`<div class="h">Note</div>
       <div class="c"><div class="msg">先に「OSボリュームのパーティション」でサイズを指定してください。</div>
-        <div class="jp"><span class="k">操作メモ</span>パーティションで <b>${M.partMB} MB</b> を入力→アップデート。未指定だとCに全容量が割り当てられます。</div></div>
+        <div class="jp"><span class="k">操作メモ</span>パーティション画面で推奨を OFF → サイズの数字をクリック → <b>${M.partMB} MB</b> を入力 → 行左の <b>✓（Update）</b>で確定。未指定だとCに全容量が割り当てられます。</div></div>
       <div class="btns"><button class="pri" onclick="hideDlg();go('ip_part')">パーティションへ</button></div>`);
     return;
   }

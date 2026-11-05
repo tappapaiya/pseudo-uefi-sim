@@ -685,6 +685,11 @@
   table.ippt input.lblin{width:110px;color:#a8a8a8;background:transparent;border:none;border-bottom:1px solid #ccc;}
   table.ippt tr.editing input:not(.lblin),table.ippt tr.editing select{border:none;border-bottom:1px solid #ccc;background:transparent;}
   table.ippt tr.addrow input,table.ippt tr.addrow select{border:none;border-bottom:1px solid #ccc;background:transparent;color:#444;}
+
+  /* 実機の表示範囲：トグル〜パーティションの帯〜表の見出しまでしか見えない内側スクロール枠。
+     実機はスクロールバーが既定で表示されない＝下に続きがあると気づきにくい（ユーザー実体験）→ バーを隠す */
+  .ippane{height:250px;overflow-y:auto;border:1px solid #ececec;scrollbar-width:none;-ms-overflow-style:none;}
+  .ippane::-webkit-scrollbar{display:none;}
 </style>
 </head>
 <body>
@@ -1646,6 +1651,7 @@ function ipPartMain(){
       ${ipNav('part')}
       <div class="ipcontent">
         <div class="ipsec" style="margin-top:0">OSボリュームのパーティション（OS Volume Partitions）</div>
+        <div class="ippane" id="ipPane">
         <div class="iptogrow"><span class="ipsw${rec?' on':''}${rec?' railb':''}" onclick="ipTogRec()" title="クリックで ON/OFF"></span>
           <span>推奨パーティションの使用（Use Recommended Partition）</span></div>
         <div class="ipsmall">Select one following drive to configure as OS drive（OS用ドライブを選択）</div>
@@ -1663,9 +1669,11 @@ function ipPartMain(){
             ${basic}
           </table>
         </div>
+        </div>
       </div>
     </div>
     <div class="anno"><span class="k">操作メモ</span>②c パーティション。C:（Basic data partition）を <b>${target.toLocaleString()} MB</b> にする。<br>
+      <b style="color:#b23b2e">⚠ 実機の落とし穴：</b>この画面は<b>トグル〜表の枠が下にスクロール</b>でき、<b>Cドライブのサイズ欄は枠の下に隠れています</b>。実機は<b>スクロールバーが表示されない</b>ため気づきにくく、サイズ未設定のまま進めてやり直しになった実例あり。<b>枠の中でマウスホイールを下へ</b>。<br>
       ${rec ? '<b>① 「推奨パーティションの使用」のトグルをクリックして OFF</b>（既定 ON＝全容量がCに割り当てられ、表はグレーで編集不可）。'
        : !edit && !done ? '<b>② Basic data partition の緑のサイズ数字をクリック</b> → 行が編集モードになる。'
        : edit && draft!==target ? `<b>③ Size (MB) に ${target} を入力</b>（スピナー ▲▼ か直接入力→Enter）。PERCENTAGE は自動で連動（小数1桁）。`
@@ -1685,18 +1693,23 @@ function ipNav(cur){
         ${a('fw','ファームウェアアップデート','')}
       </div>`;
 }
+function ipPartRender(){
+  const pn=document.getElementById('ipPane'); const y=pn?pn.scrollTop:0;
+  render('ip_part');
+  const n=document.getElementById('ipPane'); if(n) n.scrollTop=y;
+}
 function ipTogRec(){
   state.ipRecPart = !state.ipRecPart;
   state.ipPartSet = false; state.ipPartEdit = false; state.ipPartDraft = null; state.ipPartSize = null;
-  render('ip_part');
+  ipPartRender();
 }
-function ipPartBeginEdit(){ state.ipPartEdit = true; state.ipPartDraft = null; render('ip_part'); }
+function ipPartBeginEdit(){ state.ipPartEdit = true; state.ipPartDraft = null; ipPartRender(); }
 function ipPartSz(v){
-  state.ipPartDraft = Math.max(1, Math.min(M.diskMB, parseInt(v,10)||M.diskMB)); render('ip_part');
+  state.ipPartDraft = Math.max(1, Math.min(M.diskMB, parseInt(v,10)||M.diskMB)); ipPartRender();
 }
 function ipPartPct(v){
   const p = Math.max(0.1, Math.min(100, parseFloat(v)||100));
-  state.ipPartDraft = Math.round(M.diskMB*p/100); render('ip_part');
+  state.ipPartDraft = Math.round(M.diskMB*p/100); ipPartRender();
 }
 function ipPartCommit(){
   // 行左の ✓（Update）：編集中の値で確定
@@ -1704,7 +1717,7 @@ function ipPartCommit(){
   if(d==null) return;
   state.ipPartSize = d; state.ipPartEdit = false; state.ipPartDraft = null;
   state.ipPartSet = d < M.diskMB;
-  render('ip_part');
+  ipPartRender();
 }
 function ipPartAdd(){
   showDlg(`<div class="h">Add Partition</div>

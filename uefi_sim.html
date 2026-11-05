@@ -858,11 +858,13 @@ function ipReset(){ state.ipLang='English (US)'; state.ipWizardSkipped=false; st
   state.ipSource=null; state.ipPartSet=false; state.ipAllowed=false; state.ipRecPart=true; state.ipPartSize=null; state.ipPartEdit=false; state.ipPartDraft=null;
   state.ipPrefLang='English (US)'; state.ipPrefTab='basic'; state.ipPrefDone=false; }
 
+// 画面に出る iLO IPv4：既定（DHCP 有効・アドレス未取得）は 0.0.0.0。手順C で固定IPを保存した後だけ設定値を表示
+function iloShown(){ return (mode==='rail' && state.iloIpSet) ? M.ilo : '0.0.0.0'; }
 // --- 共通パーツ ---
 function sidebar(){
   return `<aside class="side">
     <div class="info"><div class="model">HPE<br>${M.model}</div>
-      Server SN: ${M.sn}<br>iLO IPv4: ${M.ilo}<br>iLO IPv6: ${M.ilo6}<br>User Default: OFF<br>
+      Server SN: ${M.sn}<br>iLO IPv4: ${iloShown()}<br>iLO IPv6: ${M.ilo6}<br>User Default: OFF<br>
       Secure Boot: ${state.secureBoot}<br>Boot Mode: UEFI<br>System ROM: ${M.rom} (${M.romDate})</div>
     <div class="keys"><b>Enter:</b>Select<br><b>ESC:</b>Exit<br><b>F1:</b>Help<br>
       <b>F7:</b>Load Defaults<br><b>F10:</b>Save<br><b>F12:</b>Save and Exit</div>
@@ -984,7 +986,7 @@ HPE Memory authenticated in all populated DIMM slots.
       <div class="pl" data-t="3300">
 Starting required devices. Please wait, this may take a few moments<span id="postDots"></span></div>
       </div>
-      <div class="postlog pl" data-t="4700" style="margin-top:auto">iLO 6 IPv4: ${M.ilo}
+      <div class="postlog pl" data-t="4700" style="margin-top:auto">iLO 6 IPv4: ${iloShown()}
 iLO 6 IPv6: ${M.ilo6}</div>
       <div class="postkeys pl" data-t="800">
         <span class="fkey" id="fk-sysutil" onclick="postKey('sysutil')"><b>F9</b> System Utilities</span>
@@ -3004,7 +3006,7 @@ function sbSysinfoMain(){
     ${kv('System ROM', M.rom)}
     ${kv('Processor', 'Intel(R) Xeon(R) Bronze 3408U (8 cores)')}
     ${kv('Total Memory', '16 GB')}
-    ${kv('iLO IPv4', M.ilo)}
+    ${kv('iLO IPv4', iloShown())}
     ${kv('Secure Boot', sb.bios.secureBoot)}
     ${kv('Boot Mode', sb.bios.bootMode)}
     <div class="grp">STORAGE:</div>

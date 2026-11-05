@@ -592,6 +592,54 @@
     border:2.5px solid #01a982!important;box-shadow:none!important;background:transparent;
     height:auto!important;aspect-ratio:3.8/1;flex:0 0 auto;}
   .sum .hd .logo{border-width:2px!important;}
+
+  /* ===== IP（Intelligent Provisioning）：実画面スクショ（DL380 Gen10・IP本体は共通UI）準拠 ===== */
+  .ipscreen{font-family:"Hiragino Kaku Gothic ProN","Meiryo",Arial,sans-serif;}
+  .iptop{background:#485963;padding:14px 26px 12px;gap:0;}
+  .iptop .hpelogo{display:flex;flex-direction:column;color:#fff;line-height:1.05;width:150px;flex:0 0 150px;font-family:Arial,"Helvetica Neue",sans-serif;}
+  .iptop .hpelogo i{display:block;width:40px;height:11px;border:2.5px solid #01a982;margin-bottom:5px;}
+  .iptop .hpelogo b{font-size:14px;font-weight:700;}
+  .iptop .hpelogo span{font-size:14px;}
+  .iptop .mdl{font-size:20px;font-weight:400;letter-spacing:.01em;font-family:Arial,"Helvetica Neue",sans-serif;}
+  .iptop .ic{gap:14px;opacity:1;align-items:center;}
+  .iptop .ic svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  /* バナー：データセンターのラック列を思わせる暗い帯（写真の代わりにCSSで表現）、見出しと副題の間を大きく空ける */
+  .ipbanner{padding:56px 24px 50px;
+    background:
+      linear-gradient(180deg,rgba(0,0,0,.25) 0%,rgba(0,0,0,.55) 100%),
+      repeating-linear-gradient(90deg,#1a1d20 0 46px,#2b3034 46px 50px,#111315 50px 54px),
+      #121416;}
+  .ipbanner::before{opacity:.9;background:
+      repeating-linear-gradient(180deg,transparent 0 18px,rgba(0,169,130,.10) 18px 20px),
+      repeating-linear-gradient(90deg,transparent 0 46px,rgba(255,255,255,.07) 46px 48px);}
+  .ipbanner h2{font-size:34px;margin:0 0 44px;letter-spacing:.01em;}
+  .ipbanner p{font-size:16px;opacity:.95;}
+  /* ボタン：実機は2つとも塗りの緑・角なし */
+  .ipbtn{background:#01a982;border-radius:0;min-width:300px;padding:10px 30px;font-size:16px;}
+  .ipbtn:hover{background:#00bf93;}
+  /* レビュー画面：見出し帯は薄灰に灰文字＋緑の鉛筆、項目は「ラベル: 値」（ラベル濃・値は灰） */
+  .iprss{background:#f7f7f7;border-bottom:none;font-size:15px;color:#555;padding:12px 22px;}
+  .ipsec{background:#f7f7f7;font-weight:400;color:#666;font-size:16px;padding:12px 14px;margin:14px 0 8px;border-radius:0;}
+  .ipkv{padding:7px 14px;font-size:15px;}
+  .ipkv .k{width:auto;flex:0 0 auto;color:#2a2c31;margin-right:12px;}
+  .ipkv .k::after{content:":";}
+  .ipkv .v{color:#666;font-weight:400!important;}
+  .ipkv .v b{font-weight:400;}
+  .ipnav{font-size:15px;}
+  .ipnav .h{font-size:15px;color:#666;margin:10px 0 10px;}
+  .ipnav a{color:#555;font-weight:400;padding:8px 10px 8px 26px;}
+  .ipnav a.dead{color:#555;}
+  .ipnav a.on{color:#2a2c31;}
+  /* 左下の大きな「<」（前の画面へ） */
+  .ipback{display:block;margin:0 0 16px 22px;width:34px;height:46px;cursor:pointer;flex:0 0 auto;}
+  .ipback svg{width:100%;height:100%;stroke:#01a982;fill:none;stroke-width:2.2;}
+  .ipback:hover svg{stroke:#00c79c;}
+  /* メンテナンスの実行：緑の線画アイコン＋灰色ラベルの4列グリッド */
+  .ipmaint{display:grid;grid-template-columns:repeat(4,1fr);row-gap:26px;padding:22px 30px 30px;}
+  .ipmaint .it{display:flex;flex-direction:column;align-items:center;gap:12px;color:#666;font-size:14px;text-align:center;cursor:default;padding:6px 4px;border-radius:4px;}
+  .ipmaint .it svg{width:58px;height:58px;stroke:#01a982;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .ipmaint .it.go{cursor:pointer;}
+  .ipmaint .it:hover{background:#f2f8f6;}
 </style>
 </head>
 <body>
@@ -672,6 +720,7 @@
         <a onclick="jump('ip_boot')">起動メニュー</a> ›
         <a onclick="jump('ip_splash')">初回設定/言語</a> ›
         <a onclick="jump('ip_home')">IPホーム</a> ›
+        <a onclick="jump('ip_maint')">メンテナンスの実行</a> ›
         <a onclick="jump('ip_pref')">環境設定(言語)</a> ›
         <a onclick="jump('ip_source')">① ソース選択</a> ›
         <a onclick="jump('ip_prep')">構成の準備</a> ›
@@ -1083,6 +1132,7 @@ const SCREENS = {
   ip_boot:    { type:'ipboot', main:'' },
   ip_splash:  { type:'ipsplash', main:'' },
   ip_home:    { type:'ip', banner:{h2:'Intelligent Provisioning', p:'世界屈指の高度なサーバー構成ソフトウェア'}, main:'' },
+  ip_maint:   { type:'ip', banner:{h2:'メンテナンスの実行', p:'パワフルなツールで、デバイスをメンテナンス'}, main:'' },
   ip_pref:    { type:'ip', rss:'Intelligent Provisioning Preferences（環境設定）', main:'' },
   ip_source:  { type:'ip', banner:{h2:'Rapid Setup', p:'OSのインストールと構成をセットアップするための迅速でシンプルなプロセス'}, main:'' },
   ip_prep:    { type:'ip', rss:'RSS &rsaquo; 構成の準備', main:'' },
@@ -1319,8 +1369,8 @@ function iloSaved(){
    手順D: Intelligent Provisioning（GUI）— シェル・動的main・操作
    ============================================================ */
 function ipTop(){
-  return `<div class="iptop"><span class="logo"></span><span class="mdl">${M.model}</span>
-    <span class="ic">🌐 🏠 🛒 ? ⓘ ⏻</span></div>`;
+  return `<div class="iptop"><span class="hpelogo"><i></i><b>Hewlett Packard</b><span>Enterprise</span></span><span class="mdl">${M.model}</span>
+    <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg><svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7M6 9.5V20h4v-5h4v5h4V9.5"/></svg><svg viewBox="0 0 24 24"><path d="M3 4h3l2.5 11h10l2-8H7"/><circle cx="10" cy="19" r="1.3"/><circle cx="17" cy="19" r="1.3"/></svg><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.7-.8 1.2V14"/><circle cx="12" cy="17" r=".5"/></svg><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".5"/></svg><svg viewBox="0 0 24 24"><path d="M12 3v8M7 6.5a7 7 0 1 0 10 0"/></svg></span></div>`;
 }
 /* --- 00: IPブートメニュー（グレー） --- */
 function renderIpBoot(s){ return `<section class="screen">${ipBootMain()}</section>`; }
@@ -1371,13 +1421,14 @@ function renderIp(s){
     ${s.banner ? `<div class="ipbanner"><h2>${s.banner.h2}</h2>${s.banner.p?`<p>${s.banner.p}</p>`:''}</div>`:''}
     ${s.rss ? `<div class="iprss">${s.rss}</div>`:''}
     <div class="ipbody">${s.main}</div>
+    ${s!==SCREENS.ip_home ? `<span class="ipback" onclick="back()" title="前の画面へ"><svg viewBox="0 0 34 46"><path d="M30 2 4 23l26 21"/></svg></span>`:''}
   </section>`;
 }
 function ipHomeMain(){
   return `
-    <div style="text-align:center;padding:26px 0 14px;">
-      <button class="ipbtn railb" onclick="ipStartRapid()">Rapid Setup</button>
-      <button class="ipbtn ghost" style="margin-left:14px" onclick="ipMaintNote()">メンテナンスの実行</button>
+    <div style="text-align:center;padding:100px 0 30px;">
+      <button class="ipbtn${state.ipPrefDone?' railb':''}" onclick="ipStartRapid()">Rapid Setup</button>
+      <button class="ipbtn${state.ipPrefDone?'':' railb'}" style="margin-left:14px" onclick="go('ip_maint')">メンテナンスの実行</button>
     </div>
     <div class="anno"><span class="k">手順D</span>OSインストールは <b>Rapid Setup</b>（左）。以降
       <b>①インストールソース選択 → ②インストール設定（OS設定・パーティション）→ ③設定のレビュー</b> の3段階（第4章）。<br>
@@ -1453,9 +1504,9 @@ function ipReviewMain(){
         <div class="ipkv"><span class="k">メディアソース</span><span class="v">DVD-ROM メディア</span></div>
         <div class="ipkv"><span class="k">オペレーティングシステム</span><span class="v">${M.os}</span></div>
         <div class="ipsec">ストレージコントローラー <span style="color:#00a982">✎</span></div>
-        <div style="padding:4px 12px;font-size:13px;line-height:1.9;color:#2a2c31;">
-          ブートコントローラー：<br>
-          &nbsp;• <b>${M.ctrl}</b><br>
+        <div style="padding:4px 14px;font-size:15px;line-height:1.9;color:#666;">
+          <span style="color:#2a2c31">ブートコントローラー:</span><br>
+          &nbsp;• ${M.ctrl}<br>
           &nbsp;&nbsp;&nbsp;○ OSボリューム<br>
           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▪ MR408i-o_Gen11-0065…26200<br>
           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${M.disk}（RAID-1）
@@ -1611,6 +1662,17 @@ function ipPrepExit(){
 }
 function ipToggleOsDd(){ state.ipOsDd=!state.ipOsDd; render('ip_os'); }
 function ipPickSource(v){ state.ipSource=v; render('ip_source'); }
+function ipMaintMain(){
+  return `<div class="ipmaint"><div class="it" onclick="ipMaintItem('ファームウェアのアップデート')"><svg viewBox="0 0 48 48"><path d="M14 34H12a8 8 0 0 1-1-15.9A12 12 0 0 1 34 15a8 8 0 0 1 2 15.8H34"/><path d="M24 22v18M18 34l6 6 6-6"/></svg><span>ファームウェアのアップデート</span></div><div class="it go${state.ipPrefDone?"":" railb"}" onclick="go('ip_pref')"><svg viewBox="0 0 48 48"><circle cx="16" cy="16" r="5"/><path d="M16 6v3M16 23v3M6 16h3M23 16h3M9 9l2 2M21 21l2 2M9 23l2-2M21 11l2-2"/><circle cx="32" cy="22" r="4"/><path d="M32 14v3M32 27v3M24 22h3M37 22h3"/><circle cx="20" cy="36" r="4"/><path d="M20 28v3M20 41v3M12 36h3M25 36h3"/></svg><span>Intelligent Provisioning環境設定</span></div><div class="it" onclick="ipMaintItem('Active Health Systemログ')"><svg viewBox="0 0 48 48"><path d="M12 4h17l9 9v31H12z"/><path d="M29 4v9h9M17 22h16M17 29h16M17 36h16"/></svg><span>Active Health Systemログ</span></div><div class="it" onclick="ipMaintItem('展開設定')"><svg viewBox="0 0 48 48"><circle cx="17" cy="16" r="5"/><circle cx="31" cy="16" r="5"/><path d="M6 38c0-7 5-12 11-12s11 5 11 12M20 38c0-7 5-12 11-12s11 5 11 12"/></svg><span>展開設定</span></div><div class="it" onclick="ipMaintItem('BIOS/プラットフォーム構成')"><svg viewBox="0 0 48 48"><path d="M30 6a10 10 0 0 0-9 14L7 34a4 4 0 0 0 6 6l14-14a10 10 0 0 0 14-9l-6 6-6-2-2-6z"/></svg><span>BIOS/プラットフォーム構成</span></div><div class="it" onclick="ipMaintItem('iLO構成')"><svg viewBox="0 0 48 48"><rect x="8" y="6" width="32" height="36"/><path d="M8 14h32M8 22h32M8 30h32M13 10h20M13 18h20M13 26h20M13 34h20"/></svg><span>iLO構成</span></div><div class="it" onclick="ipMaintItem('Intelligentストレージ構成')"><svg viewBox="0 0 48 48"><path d="M38 8c-10 0-18 8-21 17l6 6c9-3 17-11 17-21z"/><path d="M17 25l-7 1-4 6 9 1M23 31l-1 7-6 4-1-9M11 37c-2 2-3 5-3 5s3-1 5-3"/></svg><span>Intelligentストレージ構成</span></div><div class="it" onclick="ipMaintItem('システムの消去およびリセット')"><svg viewBox="0 0 48 48"><path d="M30 8l8 8-18 18H12v-8z"/><path d="M8 42h32"/></svg><span>システムの消去およびリセット</span></div><div class="it" onclick="ipMaintItem('One-buttonセキュア消去')"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="16"/><path d="M13 13l22 22"/></svg><span>One-buttonセキュア消去</span></div><div class="it" onclick="ipMaintItem('ハードウェア検証ツール')"><svg viewBox="0 0 48 48"><rect x="7" y="14" width="34" height="26"/><path d="M18 14V9h12v5M24 21v12M18 27h12"/></svg><span>ハードウェア検証ツール</span></div><div class="it" onclick="ipMaintItem('MR Storage Administrator')"><svg viewBox="0 0 48 48"><path d="M24 6l7 4v8l-7 4-7-4v-8zM17 22l7 4v8l-7 4-7-4v-8zM31 22l7 4v8l-7 4-7-4v-8z"/></svg><span>MR Storage Administrator</span></div><div class="it" onclick="ipMaintItem('SR Storage Administrator')"><svg viewBox="0 0 48 48"><path d="M24 6l7 4v8l-7 4-7-4v-8zM17 22l7 4v8l-7 4-7-4v-8zM31 22l7 4v8l-7 4-7-4v-8z"/></svg><span>SR Storage Administrator</span></div></div>
+    <div class="anno"><span class="k">手順D</span>使うのは <b>「Intelligent Provisioning環境設定」</b>（IP自体の言語・タイムゾーン等）。<b>Rapid Setup に入る前に開いて日本語に</b>しておくと、以降の画面が日本語で進みます。他の項目はファーム更新・iLO・RAID などの保守機能で、手順A〜C/E（F9・F11側）で実施済み。<br>
+      <span style="font-size:11px">※項目の並びは Gen10 の実画面に準拠（Gen11 では一部項目が異なる可能性あり）。左下の「&lt;」で前の画面に戻ります。</span></div>`;
+}
+function ipMaintItem(name){
+  showDlg(`<div class="h">${name}</div>
+    <div class="c"><div class="msg">${name}</div>
+      <div class="jp"><span class="k">操作メモ</span>この保守機能は本シミュレータでは未実装です（実機で確認）。手順Dで使うのは「Intelligent Provisioning環境設定」です。</div></div>
+    <div class="btns"><button class="pri" onclick="hideDlg()">OK</button></div>`);
+}
 function ipMaintNote(){
   showDlg(`<div class="h">メンテナンスの実行（Perform Maintenance）</div>
     <div class="c"><div class="msg">Intelligent Provisioning環境設定 / ファームウェアアップデート / Active Health System ダウンロード / 展開設定 / BIOS構成 / iLO構成 / ハードウェア検証 …などの保守メニュー。</div>
@@ -1981,6 +2043,7 @@ function buildMain(id){
   if(id==='ip_splash')       SCREENS.ip_splash.main       = ipSplashMain();
   if(id==='ip_home')         SCREENS.ip_home.main         = ipHomeMain();
   if(id==='ip_pref')         SCREENS.ip_pref.main         = ipPrefMain();
+  if(id==='ip_maint')        SCREENS.ip_maint.main        = ipMaintMain();
   if(id==='ip_source')       SCREENS.ip_source.main       = ipSourceMain();
   if(id==='ip_prep')         SCREENS.ip_prep.main         = ipPrepMain();
   if(id==='ip_review')       SCREENS.ip_review.main       = ipReviewMain();

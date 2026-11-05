@@ -472,6 +472,60 @@
   .b-jbod{background:#e6e9ec;color:#5b6470;}
   /* 画面最下部の最終更新日表示 */
   .lastupd{text-align:center;font-size:11px;color:#8697a3;padding:10px 0 14px;}
+
+  /* ===== 実機スクショ準拠の見た目（2026-11-05・ユーザー提供の Gen11 System Utilities 実画面から採色/採寸） ===== */
+  :root{ --bar:#3a495a; --bar2:#3a495a; --green:#5a7a72; --taupe:#84746c; --hl:#01b28a; --circ:#c6e9d8; }
+  .cap,.crumbs,.side,.main,.foot,.dlg{font-family:Arial,"Helvetica Neue",Helvetica,"Hiragino Kaku Gothic ProN",sans-serif;}
+  /* キャプションバー：左にHPEロゴ（緑の枠＋社名2行）、細めで大きい画面名、白い線画アイコン */
+  .cap{padding:12px 18px 6px;gap:0;}
+  .cap .hpelogo{display:flex;flex-direction:column;width:150px;flex:0 0 150px;color:#fff;line-height:1.05;}
+  .cap .hpelogo i{display:block;width:34px;height:9px;border:2px solid #01a982;margin-bottom:5px;}
+  .cap .hpelogo b{font-size:12.5px;font-weight:700;letter-spacing:.01em;}
+  .cap .hpelogo span{font-size:12.5px;font-weight:400;}
+  .cap h1{font-size:28px;font-weight:400;letter-spacing:.01em;}
+  .cap .icons{gap:20px;opacity:1;align-items:center;}
+  .cap .icons svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  /* パンくず：キャプションと同じ紺灰の帯、家アイコン、白い線の「>」区切り */
+  .crumbs{background:var(--bar);font-size:14px;color:#fff;padding:0 6px 6px;}
+  .crumbs .c{background:none;padding:6px 34px 6px 12px;display:flex;align-items:center;gap:8px;}
+  .crumbs .c.home{padding-left:12px;}
+  .crumbs .c::before{display:none;}
+  .crumbs .c::after{content:"";position:absolute;right:10px;top:50%;width:16px;height:16px;border:none;
+    border-top:1.5px solid #fff;border-right:1.5px solid #fff;transform:translateY(-50%) rotate(45deg) skew(8deg,8deg);z-index:2;}
+  .crumbs .c.cur{font-weight:400;}
+  .crumbs .c svg{width:20px;height:18px;fill:#fff;flex:0 0 auto;}
+  /* 左パネル：くすんだ緑灰が大半、キー凡例は下端の小さなタープ色ブロック */
+  .side{width:300px;flex:0 0 300px;border-top:3px solid #fff;}
+  .side .info{flex:1;padding:10px 12px;font-size:12.5px;line-height:1.12;color:#fff;}
+  .side .info .model{font-size:20px;font-weight:400;line-height:1.08;margin-bottom:6px;}
+  .side .keys{flex:0 0 auto;font-size:10.5px;line-height:1.12;padding:8px 14px 10px;border-top:3px solid #fff;color:#fff;}
+  .side .keys b{width:46px;font-weight:400;}
+  /* メニュー行：太字の黒、選択は文字部分だけ緑、後ろに薄緑の丸矢印 */
+  .main{padding:10px 26px;}
+  .row{padding:3px 6px;}
+  .row:hover{background:transparent;}
+  .row .lbl{color:#302e31;font-weight:700;font-size:13.5px;}
+  .row.menu{justify-content:flex-start;padding:1px 6px;gap:4px;}
+  .row .lbl{font-size:14px;}
+  .row.menu .lbl{flex:0 0 auto;color:#302e31;padding:1px 5px;margin-left:-5px;}
+  .row.menu:hover,.main .row.kbsel,.main .row.menu.kbsel,.rail{background:transparent;}
+  .row.menu:hover .lbl{color:#302e31;}
+  .main .row.kbsel .lbl,.main .row.menu:hover.kbsel .lbl{background:var(--hl);color:#fff!important;}
+  .main .row.menu.inert.kbsel .lbl{background:#9aa2ab;}
+  .row.menu .arrow{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;
+    background:var(--circ);color:#fff;font-size:8px;line-height:1;margin-left:4px;flex:0 0 auto;}
+  .main .row.kbsel .arrow{background:#2fae8e;color:#fff!important;}
+  .row.menu.inert .arrow{background:#e3e6e9;color:#fff;}
+  .rail{box-shadow:none;}
+  .main .row.rail.kbsel::after,.rail::after{color:var(--hl);}
+  /* フォーム行のドロップダウン/入力：細枠・中央寄せ・∨ */
+  .ctl{width:270px;flex:0 0 270px;}
+  .main select,.main input{height:22px;padding:1px 26px 1px 8px;border:1px solid #cbcbcd;border-radius:0;font-size:12.5px;
+    font-family:inherit;color:#302e31;text-align:center;text-align-last:center;background-color:#fff;}
+  .main select{-webkit-appearance:none;appearance:none;cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23302e31' stroke-width='1.4'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 7px center;}
+  .main input{padding-right:8px;}
 </style>
 </head>
 <body>
@@ -590,7 +644,8 @@
 // 本機の値（1箇所で管理）
 const M = {
   model:'ProLiant DL320 Gen11', sn:'XXXXXXXXX',
-  ilo:'169.254.0.2', iloMask:'255.255.0.0', rom:'U63 v1.32',
+  ilo:'169.254.0.2', iloMask:'255.255.0.0', rom:'U63 v1.32', romDate:'03/23/2023',
+  ilo6:'FE80::XXXX:XXXX:XXXX:XXXX',   // 実機の左パネルに IPv6 行あり（値は伏せ字）
   ctrl:'HPE MR408i-o Gen11', slot:'OCP Slot 14',
   // 手順D（Intelligent Provisioning）用
   os:'Microsoft Windows Server 2022 Standard (Desktop Experience)',
@@ -641,10 +696,10 @@ function ipReset(){ state.ipLang='English (US)'; state.ipWizardSkipped=false; st
 function sidebar(){
   return `<aside class="side">
     <div class="info"><div class="model">HPE<br>${M.model}</div>
-      Server SN: ${M.sn}<br>iLO IPv4: ${M.ilo}<br>User Default: OFF<br>
-      Secure Boot: ${state.secureBoot}<br>System ROM: ${M.rom}</div>
-    <div class="keys"><b>Enter</b>Select<br><b>ESC</b>Exit<br><b>F1</b>Help<br>
-      <b>F7</b>Load Defaults<br><b>F10</b>Save<br><b>F12</b>Save and Exit</div>
+      Server SN: ${M.sn}<br>iLO IPv4: ${M.ilo}<br>iLO IPv6: ${M.ilo6}<br>User Default: OFF<br>
+      Secure Boot: ${state.secureBoot}<br>System ROM: ${M.rom} (${M.romDate})</div>
+    <div class="keys"><b>Enter:</b>Select<br><b>ESC:</b>Exit<br><b>F1:</b>Help<br>
+      <b>F7:</b>Load Defaults<br><b>F10:</b>Save<br><b>F12:</b>Save and Exit</div>
   </aside>`;
 }
 function footer(f){
@@ -699,12 +754,21 @@ function crumbsHtml(arr){
       if(last){ cls+=' cur'; }                                   // 現在地＝クリック不可
       else if(to){ cls+=' nav'; attr=` onclick="crumbNav('${to}')"`; }  // 実機同様その画面へ
       else { cls+=' nav'; attr=' onclick="back()"'; }            // マップ外(☰ More Forms等)は1つ戻る
-      return `<span class="${cls}"${attr}>${c}</span>`;
+      const txt = c.startsWith('🏠 ') ? `<svg viewBox="0 0 20 18"><path d="M10 1 1 9h2.5v8h5v-5h3v5h5V9H19z"/></svg>${c.slice(3)}` : c;
+      return `<span class="${cls}"${attr}>${txt}</span>`;
     }).join('') + `</div>`;
 }
+const HPE_LOGO = `<span class="hpelogo"><i></i><b>Hewlett Packard</b><span>Enterprise</span></span>`;
+const CAP_ICONS = `<span class="icons">
+      <svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.1L3 17.7 6.3 21l6.3-6.3a4 4 0 0 0 5.1-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M9 9a3 3 0 1 1 4 2.8c-.7.3-1 1-1 1.7V15"/><circle cx="12" cy="19" r=".6"/></svg>
+      <svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5 20 20"/></svg>
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>
+      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg>
+    </span>`;
 function capBar(h1){
-  return `<div class="cap"><span class="logo"></span><h1>${h1}</h1>
-    <span class="icons">🔧 ? 🔍 🌐 ⟳ 🗄</span></div>`;
+  return `<div class="cap">${HPE_LOGO}<h1>${h1}</h1>${CAP_ICONS}</div>`;
 }
 
 // HII画面のシェル生成
@@ -730,7 +794,7 @@ function renderPost(){
         <div class="postbar" id="postBar"></div></div>
       <div class="pl" data-t="800">(C) Copyright 1982-2026 Hewlett Packard Enterprise Development LP<br>
       HPE ${M.model}<br>
-      System ROM Version: ${M.rom} (03/23/2023)<br>
+      System ROM Version: ${M.rom} (${M.romDate})<br>
       Serial Number: ${M.sn}<br><br></div>
       <div class="pl" data-t="1900">Installed System Memory: 16 GB, Available System Memory: 16 GB<br></div>
       <div class="pl" data-t="2300">1 Processor(s) detected, 8 total cores enabled<br>
@@ -768,7 +832,9 @@ const SCREENS = {
       <div class="row menu"><span class="lbl">System Information</span><span class="arrow">➜</span></div>
       <div class="row menu"><span class="lbl">System Health</span><span class="arrow">➜</span></div>
       <div class="row menu" style="margin-top:14px" onclick="rebootPrompt()"><span class="lbl">Exit and resume system boot</span></div>
-      <div class="row menu" onclick="rebootPrompt()"><span class="lbl">Reboot the System</span></div>` },
+      <div class="row menu" onclick="rebootPrompt()"><span class="lbl">Reboot the System</span></div>
+      <div class="row" style="margin-top:14px"><span class="lbl">Select Language</span><span class="ctl"><select><option>English</option></select></span></div>
+      <div class="row"><span class="lbl">Setup Browser Selection</span><span class="ctl"><select><option>Auto</option></select></span></div>` },
 
   // 2. System Configuration 一覧（コントローラ選択）
   sysconfig: { type:'hii', h1:'System Configuration',
@@ -2350,6 +2416,8 @@ function sbSysutilMain(){
     ${inertRow('System Health')}
     <div class="row menu" data-k style="margin-top:14px" onclick="rebootPrompt()"><span class="lbl">Exit and resume system boot</span></div>
     <div class="row menu" data-k onclick="rebootPrompt()"><span class="lbl">Reboot the System</span></div>
+      <div class="row" style="margin-top:14px"><span class="lbl">Select Language</span><span class="ctl"><select><option>English</option></select></span></div>
+      <div class="row"><span class="lbl">Setup Browser Selection</span><span class="ctl"><select><option>Auto</option></select></span></div>
     ${sbBanner('自由試行モード。実機の System Utilities と同じ項目構成です。灰色の項目は実機に存在しますが本サンドボックス未対応（クリックで説明）。ドライブ本数・容量の編集は上部バーの「🧪 ドライブ構成」から。')}`;
 }
 // System Configuration（実機と同一項目・手順ヒントは載せない）
@@ -2701,8 +2769,7 @@ buildMain = function(id){
 const _capBar = capBar;
 capBar = function(h1){
   const chip = (mode==='sandbox') ? '<span class="sbchip">SANDBOX</span>' : '';
-  return `<div class="cap"><span class="logo"></span><h1>${h1}${chip}</h1>
-    <span class="icons">🔧 ? 🔍 🌐 ⟳ 🗄</span></div>`;
+  return `<div class="cap">${HPE_LOGO}<h1>${h1}${chip}</h1>${CAP_ICONS}</div>`;
 };
 
 /* ---- モード切替（サンドボックスも POST から開始＝実機同様に F9 で入る） ---- */

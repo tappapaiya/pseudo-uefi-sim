@@ -585,6 +585,13 @@
   .main .row.ro .ctl input{width:80px;}
   .main .row.ro .ctl.wide select{width:100%;}
   .crumbs .c:not(.home)::before{right:10px;}
+
+  /* HPEロゴ（緑の長方形）を全画面で統一：旧版は上と左の辺が欠けていた（IP/起動メニュー/SUM 等） */
+  .cap .logo,.iptop .logo,.ipboot .bhd .logo,.ipsplash .stop .logo,.fwmode .top .logo,
+  .fwboot .lyr-framed .top .logo,.sum .hd .logo{
+    border:2.5px solid #01a982!important;box-shadow:none!important;background:transparent;
+    height:auto!important;aspect-ratio:3.8/1;flex:0 0 auto;}
+  .sum .hd .logo{border-width:2px!important;}
 </style>
 </head>
 <body>
